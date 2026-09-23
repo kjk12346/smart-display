@@ -1,12 +1,21 @@
 package dev.smartdisplay.app
 
 import android.app.Application
+import dev.smartdisplay.app.auth.AuthStore
+import dev.smartdisplay.app.auth.HomeAssistantAuth
+import dev.smartdisplay.app.auth.Session
 import dev.smartdisplay.app.server.ServerStore
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
 
 /** Holds the app-wide singletons. */
 class SmartDisplayApp : Application() {
+    /** For work that must outlive any one screen, such as finishing a sign-in. */
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     val serverStore by lazy { ServerStore(this) }
 
     val http: OkHttpClient by lazy {
@@ -16,4 +25,6 @@ class SmartDisplayApp : Application() {
             .callTimeout(15, TimeUnit.SECONDS)
             .build()
     }
+
+    val session by lazy { Session(HomeAssistantAuth(http), AuthStore(this), serverStore, appScope) }
 }

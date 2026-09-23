@@ -1,4 +1,4 @@
-package dev.smartdisplay.app.ui.setup
+package dev.smartdisplay.app.ui.common
 
 import android.content.Context
 import android.content.Intent
@@ -9,15 +9,22 @@ import android.provider.Settings
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import dev.smartdisplay.app.R
 
 /**
  * Android 17 (API 37) makes talking to devices on the local network a runtime permission. It's enforced for apps
@@ -71,4 +78,20 @@ private fun openAppSettings(context: Context) {
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     )
+}
+
+/** Explains why the app needs local network access and asks for it. Shown before anything else when it's missing. */
+@Composable
+fun LocalNetworkPrompt(access: LocalNetworkAccess) {
+    Panel(eyebrow = stringResource(R.string.setup_eyebrow), title = stringResource(R.string.local_network_title)) {
+        PanelBody(stringResource(R.string.local_network_body))
+        if (access.mustUseSettings) PanelBody(stringResource(R.string.local_network_denied))
+        Button(onClick = access.request, modifier = Modifier.padding(top = 24.dp)) {
+            Text(
+                stringResource(
+                    if (access.mustUseSettings) R.string.local_network_settings else R.string.local_network_allow
+                )
+            )
+        }
+    }
 }

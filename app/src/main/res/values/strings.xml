@@ -2,6 +2,8 @@
 <resources>
     <!-- Placeholder name until the product name is decided. -->
     <string name="app_name">Smart Display</string>
+    <string name="server_fallback_name">Home Assistant</string>
+    <string name="change_server">Change server</string>
 
     <string name="setup_eyebrow">Set up</string>
     <string name="setup_title">Find Home Assistant</string>
@@ -12,6 +14,7 @@
     <string name="setup_address_hint">homeassistant.local:8123 or 192.168.1.20</string>
     <string name="setup_connect">Connect</string>
 
+    <string name="local_network_title">Allow network access</string>
     <string name="local_network_body">This display talks to Home Assistant directly over your home network. Android needs your permission for that.</string>
     <string name="local_network_denied">Android won\'t ask again. Allow access to devices on your local network in this app\'s permissions.</string>
     <string name="local_network_allow">Allow</string>
@@ -24,8 +27,20 @@
     <string name="problem_not_home_assistant">Something answered, but it isn\'t Home Assistant.</string>
     <string name="problem_not_onboarded">Finish setting up Home Assistant first, then try again.</string>
 
-    <string name="connected_eyebrow">Connected</string>
-    <string name="connected_fallback_name">Home Assistant</string>
-    <string name="connected_body">Signing in comes next.</string>
-    <string name="connected_change_server">Change server</string>
+    <string name="sign_in_eyebrow">Sign in</string>
+    <string name="sign_in_body">Sign in with your Home Assistant account. You only need to do this once; the display stays signed in.</string>
+    <string name="sign_in_button">Sign in</string>
+    <string name="sign_in_problem_no_browser">There\'s no web browser on this device to show Home Assistant\'s login page.</string>
+    <string name="sign_in_problem_interrupted">Sign-in didn\'t finish. Try again.</string>
+    <string name="sign_in_problem_rejected">Home Assistant didn\'t accept the sign-in. Try again.</string>
+    <string name="sign_in_problem_no_answer">Home Assistant stopped answering while finishing sign-in. Try again.</string>
+    <string name="sign_in_problem_expired">This display was signed out of Home Assistant. Sign in again.</string>
+    <string name="sign_in_problem_cant_store">This device couldn\'t store the sign-in securely.</string>
+
+    <string name="signed_in_eyebrow">Signed in</string>
+    <string name="signed_in_checking">Checking the connection…</string>
+    <string name="signed_in_ok">Connected to %1$s, Home Assistant %2$s.</string>
+    <string name="signed_in_failed">Signed in, but Home Assistant isn\'t answering right now.</string>
+    <string name="signed_in_next">The display itself comes next.</string>
+    <string name="sign_out">Sign out</string>
 </resources>

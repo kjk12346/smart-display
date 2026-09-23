@@ -4,7 +4,7 @@ An Android app that turns an old tablet into a Nest Hub–style smart display fo
 Home Assistant, and get an always-on screen with a clock, weather, room controls and (later) voice. Nothing to build
 or configure by hand, unlike a dashboard in a kiosk browser.
 
-v0.1 steps 1 (project scaffold) and 2 (find Home Assistant) are done; continue with step 3.
+v0.1 steps 1 (project scaffold), 2 (find Home Assistant) and 3 (sign in) are done; continue with step 4.
 
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
 `CLAUDE.local.md`, which is not committed. Keep personal details out of committed files and commit messages.
@@ -47,6 +47,11 @@ v0.1 steps 1 (project scaffold) and 2 (find Home Assistant) are done; continue w
      (about 30 minutes) + refresh token. Refresh with `grant_type=refresh_token`. Store the refresh token encrypted.
    - Google or other single sign-on isn't built in: whatever Home Assistant's login page offers (including SSO added
      by a Home Assistant integration) works through this same flow.
+   - **Done:** `client_id` is `https://kjk12346.github.io/smart-display/` (GitHub Pages from `docs/` on `main`),
+     redirect `smartdisplay://auth-callback`. Changing either signs every display out (refresh tokens are tied to the
+     client_id), so do it once, with the product name. Home Assistant has no PKCE; a random `state` guards the
+     redirect. The refresh token is AES-GCM encrypted with an Android Keystore key (`auth/TokenCipher.kt`); access
+     tokens live in memory only. Code in `auth/`; `Session.accessToken()` is what step 4 should use.
 4. **Live connection**: WebSocket `{ha}/api/websocket` (`auth` with the access token, then `subscribe_events`
    `state_changed`, `get_states`, `get_config`, and the area/device/entity registry lists), reconnect with backoff,
    refresh the token when it expires.

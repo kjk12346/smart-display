@@ -2,27 +2,19 @@ package dev.smartdisplay.app.ui.setup
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,18 +31,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.smartdisplay.app.R
 import dev.smartdisplay.app.discovery.DiscoveredServer
 import dev.smartdisplay.app.server.ServerProblem
+import dev.smartdisplay.app.ui.common.Panel
 import dev.smartdisplay.app.ui.theme.SmartDisplayTheme
-import dev.smartdisplay.app.ui.theme.eyebrow
 
 /** First-run screen: pick a Home Assistant server found on the network, or type its address. */
 @Composable
 fun SetupScreen(viewModel: SetupViewModel = viewModel()) {
-    val localNetwork = rememberLocalNetworkAccess()
-    if (!localNetwork.granted) {
-        LocalNetworkPrompt(mustUseSettings = localNetwork.mustUseSettings, onAllow = localNetwork.request)
-        return
-    }
-
     LifecycleStartEffect(viewModel) {
         viewModel.startDiscovery()
         onStopOrDispose { viewModel.stopDiscovery() }
@@ -64,64 +50,6 @@ fun SetupScreen(viewModel: SetupViewModel = viewModel()) {
     )
 }
 
-/** The setup screens' shared layout: a centred column under the "Set up" heading. */
-@Composable
-private fun SetupFrame(content: @Composable () -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .safeDrawingPadding()
-                .imePadding()
-                .verticalScroll(rememberScrollState()),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            Column(
-                modifier = Modifier
-                    .widthIn(max = 560.dp)
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 48.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.setup_eyebrow).uppercase(),
-                    style = MaterialTheme.typography.eyebrow,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-                Text(
-                    text = stringResource(R.string.setup_title),
-                    style = MaterialTheme.typography.headlineLarge,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-                content()
-            }
-        }
-    }
-}
-
-@Composable
-private fun LocalNetworkPrompt(mustUseSettings: Boolean, onAllow: () -> Unit) {
-    SetupFrame {
-        Text(
-            text = stringResource(R.string.local_network_body),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 24.dp),
-        )
-        if (mustUseSettings) {
-            Text(
-                text = stringResource(R.string.local_network_denied),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
-        Button(onClick = onAllow, modifier = Modifier.padding(top = 24.dp)) {
-            Text(
-                stringResource(if (mustUseSettings) R.string.local_network_settings else R.string.local_network_allow)
-            )
-        }
-    }
-}
-
 @Composable
 private fun SetupContent(
     state: SetupUiState,
@@ -129,7 +57,7 @@ private fun SetupContent(
     onAddressChange: (String) -> Unit,
     onConnectAddress: () -> Unit,
 ) {
-    SetupFrame {
+    Panel(eyebrow = stringResource(R.string.setup_eyebrow), title = stringResource(R.string.setup_title)) {
         Column(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(top = 24.dp),
