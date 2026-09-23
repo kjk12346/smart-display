@@ -65,11 +65,15 @@ private fun AppContent(app: SmartDisplayApp) {
     val current = server
     when {
         current == null -> SetupScreen()
-        session == SessionState.SignedIn -> SignedInScreen(
-            server = current,
-            loadConfig = app.session::serverConfig,
-            onSignOut = { scope.launch { app.session.signOut() } },
-        )
+        session == SessionState.SignedIn -> {
+            // Collecting keeps the live connection open while this screen is showing.
+            val home by app.home.state.collectAsStateWithLifecycle()
+            SignedInScreen(
+                server = current,
+                home = home,
+                onSignOut = { scope.launch { app.session.signOut() } },
+            )
+        }
         else -> SignInScreen(
             server = current,
             state = session,

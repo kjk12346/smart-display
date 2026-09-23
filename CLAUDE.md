@@ -4,7 +4,8 @@ An Android app that turns an old tablet into a Nest Hub–style smart display fo
 Home Assistant, and get an always-on screen with a clock, weather, room controls and (later) voice. Nothing to build
 or configure by hand, unlike a dashboard in a kiosk browser.
 
-v0.1 steps 1 (project scaffold), 2 (find Home Assistant) and 3 (sign in) are done; continue with step 4.
+v0.1 steps 1 (project scaffold), 2 (find Home Assistant), 3 (sign in) and 4 (live connection) are done; continue
+with step 5.
 
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
 `CLAUDE.local.md`, which is not committed. Keep personal details out of committed files and commit messages.
@@ -55,6 +56,13 @@ v0.1 steps 1 (project scaffold), 2 (find Home Assistant) and 3 (sign in) are don
 4. **Live connection**: WebSocket `{ha}/api/websocket` (`auth` with the access token, then `subscribe_events`
    `state_changed`, `get_states`, `get_config`, and the area/device/entity registry lists), reconnect with backoff,
    refresh the token when it expires.
+   - **Done:** `ha/HomeAssistantClient.kt`. Screens read `app.home.state` (a `HomeState`); collecting it is what
+     keeps the connection open (it stops 5 s after the last collector). Data is kept while reconnecting; check
+     `status`. Send commands with `command()` / `callService(..., returnResponse = true)`. Registry and core-config
+     update events trigger a reload of that list. Tests run the real client against a fake Home Assistant
+     (`FakeHomeAssistant.kt`, OkHttp MockWebServer).
+   - Later, for big installs on slow tablets: `subscribe_entities` (compressed diffs) instead of `state_changed`, and
+     persistent maps instead of copying `entities` on every event.
 5. **Ambient screen** (the default screen): large clock and date, weather from the first `weather.*` entity
    (current conditions from its state; today's high/low via `weather.get_forecasts` with `type: daily` and
    `return_response: true`, refreshed every 30 min), gentle pixel shift against burn-in, dim at night.

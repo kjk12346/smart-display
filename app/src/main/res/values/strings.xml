@@ -38,9 +38,14 @@
     <string name="sign_in_problem_cant_store">This device couldn\'t store the sign-in securely.</string>
 
     <string name="signed_in_eyebrow">Signed in</string>
-    <string name="signed_in_checking">Checking the connection…</string>
-    <string name="signed_in_ok">Connected to %1$s, Home Assistant %2$s.</string>
-    <string name="signed_in_failed">Signed in, but Home Assistant isn\'t answering right now.</string>
+    <string name="live_connecting">Connecting…</string>
+    <string name="live_connected">Live: %1$s, Home Assistant %2$s.</string>
+    <string name="live_waiting_unreachable">Home Assistant isn\'t answering. Trying again shortly…</string>
+    <string name="live_waiting_rejected">Home Assistant refused this display\'s sign-in. Trying again shortly…</string>
+    <string name="live_waiting_protocol">Home Assistant sent something unexpected. Trying again shortly…</string>
+    <string name="live_counts">%1$d entities, %2$d areas, %3$d devices.</string>
+    <string name="live_no_changes">Waiting for the first change…</string>
+    <string name="live_last_change">Latest change: %1$s is now %2$s.</string>
     <string name="signed_in_next">The display itself comes next.</string>
     <string name="sign_out">Sign out</string>
 </resources>

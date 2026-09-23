@@ -4,6 +4,7 @@ import android.app.Application
 import dev.smartdisplay.app.auth.AuthStore
 import dev.smartdisplay.app.auth.HomeAssistantAuth
 import dev.smartdisplay.app.auth.Session
+import dev.smartdisplay.app.ha.HomeAssistantClient
 import dev.smartdisplay.app.server.ServerStore
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -27,4 +28,7 @@ class SmartDisplayApp : Application() {
     }
 
     val session by lazy { Session(HomeAssistantAuth(http), AuthStore(this), serverStore, appScope) }
+
+    /** The live connection; it connects only while a screen is collecting its state. */
+    val home by lazy { HomeAssistantClient(http, session, { serverStore.server.value?.url }, appScope) }
 }

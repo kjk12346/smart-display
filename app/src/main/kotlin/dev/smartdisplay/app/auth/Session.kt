@@ -7,6 +7,7 @@ import android.util.Base64
 import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.net.toUri
+import dev.smartdisplay.app.ha.AccessTokenSource
 import dev.smartdisplay.app.server.ServerStore
 import java.io.IOException
 import java.security.GeneralSecurityException
@@ -50,7 +51,7 @@ class Session(
     private val store: AuthStore,
     private val servers: ServerStore,
     private val scope: CoroutineScope,
-) {
+) : AccessTokenSource {
     private val _state = MutableStateFlow(
         if (currentServer()?.let(store::refreshToken) != null) SessionState.SignedIn else SessionState.SignedOut()
     )
@@ -109,7 +110,7 @@ class Session(
      * A current access token, refreshed if it's about to expire, or null if signed out (including when Home Assistant
      * refuses the refresh token). Throws [IOException] if Home Assistant can't be reached; the caller should retry.
      */
-    suspend fun accessToken(): String? = tokenLock.withLock {
+    override suspend fun accessToken(): String? = tokenLock.withLock {
         val server = currentServer() ?: return null
         access?.takeIf { it.isFresh() }?.let { return it.token }
         val refreshToken = store.refreshToken(server)
@@ -127,11 +128,8 @@ class Session(
         }
     }
 
-    /** Checks the sign-in end to end with an authenticated request. Null if signed out. */
-    suspend fun serverConfig(): ServerConfig? {
-        val server = currentServer() ?: return null
-        val token = accessToken() ?: return null
-        return auth.fetchConfig(server, token)
+    override suspend fun invalidateAccessToken() {
+        tokenLock.withLock { access = null }
     }
 
     /** Signs out here and, if Home Assistant answers, revokes the sign-in there too. */

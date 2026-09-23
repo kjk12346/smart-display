@@ -32,8 +32,6 @@ class AccessToken(val token: String, private val expiresAtMillis: Long) {
 
 class Tokens(val access: AccessToken, val refreshToken: String)
 
-class ServerConfig(val locationName: String?, val version: String?)
-
 /** Home Assistant refused the request (bad or expired code or token), as opposed to not answering. */
 class AuthRejectedException(val code: Int) : IOException("Home Assistant refused the request: HTTP $code")
 
@@ -75,12 +73,6 @@ class HomeAssistantAuth(private val http: OkHttpClient) {
     suspend fun revoke(server: String, refreshToken: String) {
         call(Request.Builder().url("$server/auth/revoke").post(FormBody.Builder().add("token", refreshToken).build()))
             .close()
-    }
-
-    suspend fun fetchConfig(server: String, accessToken: String): ServerConfig {
-        val request = Request.Builder().url("$server/api/config").header("Authorization", "Bearer $accessToken")
-        val json = call(request).use { it.jsonOrThrow() }
-        return ServerConfig(json.optString("location_name").ifBlank { null }, json.optString("version").ifBlank { null })
     }
 
     private suspend fun postToken(server: String, body: FormBody): JSONObject =

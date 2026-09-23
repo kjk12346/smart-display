@@ -11,25 +11,21 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.smartdisplay.app.R
-import dev.smartdisplay.app.auth.ServerConfig
+import dev.smartdisplay.app.ha.ConnectionStatus
+import dev.smartdisplay.app.ha.DisconnectReason
+import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.auth.SessionState
 import dev.smartdisplay.app.auth.SignInProblem
 import dev.smartdisplay.app.server.SavedServer
 import dev.smartdisplay.app.ui.common.Panel
 import dev.smartdisplay.app.ui.common.PanelBody
 import dev.smartdisplay.app.ui.theme.SmartDisplayTheme
-import java.io.IOException
 
 /** Asks to sign in with Home Assistant's own login page, and shows progress when the browser comes back. */
 @Composable
@@ -70,45 +66,49 @@ fun SignInScreen(
     }
 }
 
-/** Stands in for the display until the live connection (v0.1 step 4) exists; proves the sign-in works. */
+/** Stands in for the display until the ambient screen (v0.1 step 5) exists; shows the live connection working. */
 @Composable
 fun SignedInScreen(
     server: SavedServer,
-    loadConfig: suspend () -> ServerConfig?,
+    home: HomeState,
     onSignOut: () -> Unit,
 ) {
-    var check by remember { mutableStateOf<ConnectionCheck>(ConnectionCheck.Checking) }
-    LaunchedEffect(server.url) {
-        check = try {
-            loadConfig()?.let(ConnectionCheck::Ok) ?: ConnectionCheck.Failed
-        } catch (e: IOException) {
-            ConnectionCheck.Failed
-        }
-    }
-
     Panel(eyebrow = stringResource(R.string.signed_in_eyebrow), title = server.displayName()) {
         PanelBody(server.url, topPadding = 4.dp)
-        val status = when (val current = check) {
-            ConnectionCheck.Checking -> stringResource(R.string.signed_in_checking)
-            ConnectionCheck.Failed -> stringResource(R.string.signed_in_failed)
-            is ConnectionCheck.Ok -> stringResource(
-                R.string.signed_in_ok,
-                current.config.locationName ?: server.displayName(),
-                current.config.version ?: "?",
+        val status = when (val current = home.status) {
+            ConnectionStatus.Connected -> stringResource(
+                R.string.live_connected,
+                home.config?.locationName ?: server.displayName(),
+                home.config?.version ?: "?",
             )
+            is ConnectionStatus.Waiting -> stringResource(
+                when (current.reason) {
+                    DisconnectReason.Unreachable -> R.string.live_waiting_unreachable
+                    DisconnectReason.Rejected -> R.string.live_waiting_rejected
+                    DisconnectReason.Protocol -> R.string.live_waiting_protocol
+                }
+            )
+            else -> stringResource(R.string.live_connecting)
         }
         PanelBody(status, topPadding = 24.dp)
+        if (home.loaded) {
+            PanelBody(
+                stringResource(R.string.live_counts, home.entities.size, home.areas.size, home.devices.size)
+            )
+            val change = home.lastChange
+            PanelBody(
+                if (change == null) {
+                    stringResource(R.string.live_no_changes)
+                } else {
+                    stringResource(R.string.live_last_change, change.friendlyName, change.state)
+                }
+            )
+        }
         PanelBody(stringResource(R.string.signed_in_next))
         OutlinedButton(onClick = onSignOut, modifier = Modifier.padding(top = 24.dp)) {
             Text(stringResource(R.string.sign_out))
         }
     }
-}
-
-private sealed interface ConnectionCheck {
-    data object Checking : ConnectionCheck
-    data object Failed : ConnectionCheck
-    data class Ok(val config: ServerConfig) : ConnectionCheck
 }
 
 @Composable
