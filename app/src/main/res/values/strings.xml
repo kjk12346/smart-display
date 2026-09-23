@@ -2,6 +2,30 @@
 <resources>
     <!-- Placeholder name until the product name is decided. -->
     <string name="app_name">Smart Display</string>
-    <string name="placeholder_eyebrow">For Home Assistant</string>
-    <string name="placeholder_body">Setup comes next: find Home Assistant on your network and sign in.</string>
+
+    <string name="setup_eyebrow">Set up</string>
+    <string name="setup_title">Find Home Assistant</string>
+    <string name="setup_searching">Looking for Home Assistant on this network…</string>
+    <string name="setup_search_nothing">Nothing found yet. Check this device is on the same Wi-Fi as Home Assistant, or type its address below.</string>
+    <string name="setup_search_failed">Couldn\'t search this network. Type Home Assistant\'s address below.</string>
+    <string name="setup_type_address">Or type its address</string>
+    <string name="setup_address_hint">homeassistant.local:8123 or 192.168.1.20</string>
+    <string name="setup_connect">Connect</string>
+
+    <string name="local_network_body">This display talks to Home Assistant directly over your home network. Android needs your permission for that.</string>
+    <string name="local_network_denied">Android won\'t ask again. Allow access to devices on your local network in this app\'s permissions.</string>
+    <string name="local_network_allow">Allow</string>
+    <string name="local_network_settings">Open settings</string>
+
+    <string name="problem_invalid_address">That doesn\'t look like an address.</string>
+    <string name="problem_not_found">Couldn\'t find that address on this network.</string>
+    <string name="problem_no_answer">No answer. Check the address, and the port if Home Assistant doesn\'t use 8123.</string>
+    <string name="problem_certificate">Couldn\'t make a secure connection. Check the certificate, or try the http:// address.</string>
+    <string name="problem_not_home_assistant">Something answered, but it isn\'t Home Assistant.</string>
+    <string name="problem_not_onboarded">Finish setting up Home Assistant first, then try again.</string>
+
+    <string name="connected_eyebrow">Connected</string>
+    <string name="connected_fallback_name">Home Assistant</string>
+    <string name="connected_body">Signing in comes next.</string>
+    <string name="connected_change_server">Change server</string>
 </resources>
