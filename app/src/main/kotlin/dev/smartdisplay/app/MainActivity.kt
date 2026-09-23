@@ -7,17 +7,21 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.smartdisplay.app.auth.REDIRECT_URI
 import dev.smartdisplay.app.auth.SessionState
+import dev.smartdisplay.app.ui.ambient.AmbientScreen
 import dev.smartdisplay.app.ui.common.LocalNetworkPrompt
 import dev.smartdisplay.app.ui.common.rememberLocalNetworkAccess
+import dev.smartdisplay.app.ui.settings.SettingsScreen
 import dev.smartdisplay.app.ui.setup.SetupScreen
 import dev.smartdisplay.app.ui.signin.SignInScreen
-import dev.smartdisplay.app.ui.signin.SignedInScreen
 import dev.smartdisplay.app.ui.theme.SmartDisplayTheme
 import kotlinx.coroutines.launch
 
@@ -66,13 +70,22 @@ private fun AppContent(app: SmartDisplayApp) {
     when {
         current == null -> SetupScreen()
         session == SessionState.SignedIn -> {
-            // Collecting keeps the live connection open while this screen is showing.
+            // Collecting keeps the live connection open while these screens are showing.
             val home by app.home.state.collectAsStateWithLifecycle()
-            SignedInScreen(
-                server = current,
-                home = home,
-                onSignOut = { scope.launch { app.session.signOut() } },
-            )
+            var showSettings by rememberSaveable { mutableStateOf(false) }
+            if (showSettings) {
+                SettingsScreen(
+                    server = current,
+                    home = home,
+                    onBack = { showSettings = false },
+                    onSignOut = {
+                        showSettings = false
+                        scope.launch { app.session.signOut() }
+                    },
+                )
+            } else {
+                AmbientScreen(home = home, onOpenSettings = { showSettings = true })
+            }
         }
         else -> SignInScreen(
             server = current,

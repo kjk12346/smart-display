@@ -37,7 +37,8 @@
     <string name="sign_in_problem_expired">This display was signed out of Home Assistant. Sign in again.</string>
     <string name="sign_in_problem_cant_store">This device couldn\'t store the sign-in securely.</string>
 
-    <string name="signed_in_eyebrow">Signed in</string>
+    <string name="settings_eyebrow">Settings</string>
+    <string name="settings_done">Done</string>
     <string name="live_connecting">Connecting…</string>
     <string name="live_connected">Live: %1$s, Home Assistant %2$s.</string>
     <string name="live_waiting_unreachable">Home Assistant isn\'t answering. Trying again shortly…</string>
@@ -46,6 +47,26 @@
     <string name="live_counts">%1$d entities, %2$d areas, %3$d devices.</string>
     <string name="live_no_changes">Waiting for the first change…</string>
     <string name="live_last_change">Latest change: %1$s is now %2$s.</string>
-    <string name="signed_in_next">The display itself comes next.</string>
     <string name="sign_out">Sign out</string>
+
+    <string name="ambient_reconnecting">Reconnecting to Home Assistant…</string>
+    <string name="ambient_high_low">H %1$s  ·  L %2$s</string>
+    <string name="ambient_high">H %1$s</string>
+    <string name="ambient_low">L %1$s</string>
+
+    <!-- Home Assistant weather conditions. -->
+    <string name="weather_clear">Clear</string>
+    <string name="weather_sunny">Sunny</string>
+    <string name="weather_partly_cloudy">Partly cloudy</string>
+    <string name="weather_cloudy">Cloudy</string>
+    <string name="weather_fog">Fog</string>
+    <string name="weather_hail">Hail</string>
+    <string name="weather_thunderstorms">Thunderstorms</string>
+    <string name="weather_heavy_rain">Heavy rain</string>
+    <string name="weather_rain">Rain</string>
+    <string name="weather_snow">Snow</string>
+    <string name="weather_sleet">Sleet</string>
+    <string name="weather_windy">Windy</string>
+    <string name="weather_windy_cloudy">Windy and cloudy</string>
+    <string name="weather_exceptional">Unusual weather</string>
 </resources>

@@ -4,8 +4,8 @@ An Android app that turns an old tablet into a Nest Hub–style smart display fo
 Home Assistant, and get an always-on screen with a clock, weather, room controls and (later) voice. Nothing to build
 or configure by hand, unlike a dashboard in a kiosk browser.
 
-v0.1 steps 1 (project scaffold), 2 (find Home Assistant), 3 (sign in) and 4 (live connection) are done; continue
-with step 5.
+v0.1 steps 1 (project scaffold), 2 (find Home Assistant), 3 (sign in), 4 (live connection) and 5 (ambient screen)
+are done; continue with step 6.
 
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
 `CLAUDE.local.md`, which is not committed. Keep personal details out of committed files and commit messages.
@@ -66,6 +66,11 @@ with step 5.
 5. **Ambient screen** (the default screen): large clock and date, weather from the first `weather.*` entity
    (current conditions from its state; today's high/low via `weather.get_forecasts` with `type: daily` and
    `return_response: true`, refreshed every 30 min), gentle pixel shift against burn-in, dim at night.
+   - **Done:** `ui/ambient/`. Weather is the first `weather.*` entity by ID that isn't hidden or disabled. "Night"
+     for dimming is fixed quiet hours, 22:00–07:00 (not sunset, which is too early in winter for a kitchen); a
+     setting later. `sun.sun` only picks night icons. Screen brightness 0.08 plus text at 55% at night. Weather
+     icons are drawn in code (`WeatherIcon.kt`). Long-press opens Settings (connection details, sign out); tap is
+     free for the controls screen.
 6. **Controls screen**: rooms from Home Assistant areas; native cards for lights (on/off, brightness), switches/plugs,
    media players (play/pause, volume hidden until the name is tapped), thermostats (mode, setpoints).
 7. **Kiosk basics** (the owner's earlier kiosk app shows how; see `CLAUDE.local.md`): keep screen on, use as Home app,

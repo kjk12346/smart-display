@@ -28,5 +28,9 @@ internal val PinkContainer = Color(0xFF3A2631)
 internal val BlueContainer = Color(0xFF1D3239)
 internal val LavenderContainer = Color(0xFF2C2638)
 
+// Weather icons: the pastel highlights plus a warm yellow for the sun and lightning.
+internal val SunYellow = Color(0xFFF4C96A)
+internal val CloudGrey = Color(0xFFD6D3DE)
+
 internal val Danger = Color(0xFFF28B82)
 internal val DangerContainer = Color(0xFF3D1F1D)
