@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Placeholder name until the product name is decided. -->
+    <string name="app_name">Smart Display</string>
+    <string name="placeholder_eyebrow">For Home Assistant</string>
+    <string name="placeholder_body">Setup comes next: find Home Assistant on your network and sign in.</string>
+</resources>

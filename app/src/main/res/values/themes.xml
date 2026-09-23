@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Only covers the window before Compose draws; the real theme is SmartDisplayTheme. -->
+    <style name="Theme.SmartDisplay" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+    </style>
+</resources>
