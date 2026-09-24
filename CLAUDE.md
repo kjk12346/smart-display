@@ -4,10 +4,11 @@ An Android app that turns an old tablet into a Nest Hub–style smart display fo
 Home Assistant, and get an always-on screen with a clock, weather, room controls and (later) voice. Nothing to build
 or configure by hand, unlike a dashboard in a kiosk browser.
 
-All v0.1 steps (1–7) are built, plus guest-room mode (below). The owner has checked screen pinning, Home app and
-landscape on a device (2026-09-24). Still to check: controls against real devices, guest mode on a device, the
-first-run flow of a release build, and anything on an old or Fire tablet. A test release APK went to a second
-household's Home Assistant.
+All v0.1 steps (1–7) are built, plus guest-room mode (below). Checked on a device (2026-09-24): screen pinning,
+Home app and landscape (by the owner), the release build's first-run flow from a fresh install, and guest mode
+(PIN required, room choice, unticking, extras, the guest's controls screen). Still to check: controls against real
+devices, and anything on an old or Fire tablet. A test release APK (before guest mode) went to a second household's
+Home Assistant.
 
 ## Guest-room mode (added after v0.1 step 7)
 
