@@ -40,6 +40,21 @@
     <string name="settings_eyebrow">Settings</string>
     <string name="settings_done">Done</string>
     <string name="cancel">Cancel</string>
+    <string name="settings_mode">Who uses this display</string>
+    <string name="mode_owner">Owner</string>
+    <string name="mode_guest">Guest room</string>
+    <string name="mode_owner_body">Every room in Home Assistant.</string>
+    <string name="mode_guest_body">One room, plus any devices you add from other rooms. Needs the exit PIN.</string>
+    <string name="guest_account_note">Tip: sign a guest room display in as its own non-admin Home Assistant user. These limits keep guests to their devices in this app, but the account itself can still reach everything, so they aren\'t a security boundary.</string>
+    <string name="guest_room">Guest\'s room</string>
+    <string name="guest_room_none">Choose the room this display is in.</string>
+    <string name="guest_in_room">Devices guests can use</string>
+    <string name="guest_room_empty">Nothing to control in this room yet.</string>
+    <string name="guest_elsewhere">From other rooms</string>
+    <string name="guest_elsewhere_none">None. Add a device from a shared space, like a bathroom speaker.</string>
+    <string name="guest_add">Add a device</string>
+    <string name="guest_add_title">Add devices from other rooms</string>
+    <string name="guest_remove">Remove</string>
     <string name="settings_display">Display</string>
     <string name="settings_keep_on">Keep screen on</string>
     <string name="settings_keep_on_body">The screen stays on while this app is showing.</string>
@@ -58,9 +73,9 @@
     <string name="settings_home_app_body">Opens on startup and when Home is pressed. Android asks you to choose it.</string>
     <string name="settings_pin_app">Pin the app</string>
     <string name="settings_pin_app_body">Keeps people in this app. Opening settings with the PIN unpins it.</string>
-    <string name="settings_needs_pin">Set an exit PIN first, so there\'s a way out.</string>
+    <string name="settings_needs_pin">Set an exit PIN first (under Kiosk), so there\'s a way out.</string>
     <string name="settings_no_home_chooser">This device doesn\'t let you choose a Home app here. Press Home to see if Android offers it.</string>
-    <string name="settings_pin_in_use">Turn off Home app and pinning before removing the PIN.</string>
+    <string name="settings_pin_in_use">Turn off guest mode, Home app and pinning before removing the PIN.</string>
     <string name="pin_enter_title">Enter exit PIN</string>
     <string name="pin_label">PIN</string>
     <string name="pin_open_settings">Open settings</string>
@@ -84,6 +99,7 @@
     <string name="ambient_low">L %1$s</string>
 
     <string name="controls_other_room">Other</string>
+    <string name="controls_guest_not_set_up">This display\'s room hasn\'t been set up yet.</string>
     <string name="controls_empty">Nothing to control yet. Lights, switches, media players and thermostats in Home Assistant show up here.</string>
     <string name="controls_error_not_connected">Not connected to Home Assistant.</string>
     <string name="controls_error_failed">Couldn\'t control %1$s.</string>

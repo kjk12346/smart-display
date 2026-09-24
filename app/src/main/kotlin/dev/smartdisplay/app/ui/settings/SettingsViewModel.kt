@@ -3,6 +3,7 @@ package dev.smartdisplay.app.ui.settings
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import dev.smartdisplay.app.SmartDisplayApp
+import dev.smartdisplay.app.kiosk.DisplayMode
 import dev.smartdisplay.app.kiosk.HomeApp
 import dev.smartdisplay.app.kiosk.KioskConfig
 import dev.smartdisplay.app.kiosk.PinCheck
@@ -12,11 +13,11 @@ import kotlinx.coroutines.withContext
 
 /** Why a kiosk option couldn't be turned on as asked. */
 enum class KioskProblem {
-    /** Home app and pinning need an exit PIN first, so there's a way out. */
+    /** Home app, pinning and guest mode need an exit PIN first, so there's a way out. */
     NeedsPin,
     /** The Home app was offered, but this device has no Home app chooser (Fire tablets). */
     NoHomeChooser,
-    /** The PIN can't be removed while Home app or pinning is on. */
+    /** The PIN can't be removed while Home app, pinning or guest mode is on. */
     PinInUse,
 }
 
@@ -46,6 +47,31 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         if (on && !config.value.hasPin) return KioskProblem.NeedsPin
         kiosk.setPinApp(on)
         return null
+    }
+
+    /** Guest mode needs the exit PIN, so switching back to the owner's view is always behind it. */
+    fun setMode(mode: DisplayMode): KioskProblem? {
+        if (mode == DisplayMode.Guest && !config.value.hasPin) return KioskProblem.NeedsPin
+        kiosk.setMode(mode)
+        return null
+    }
+
+    /** Chooses the guest's room. Devices hidden in the previous room no longer apply. */
+    fun setGuestArea(areaId: String) {
+        val guest = config.value.guest
+        if (guest.areaId != areaId) kiosk.setGuest(guest.copy(areaId = areaId, hidden = emptySet()))
+    }
+
+    /** Lets guests use a device in their room, or hides it from them. */
+    fun setGuestAllowed(entityId: String, allowed: Boolean) {
+        val guest = config.value.guest
+        kiosk.setGuest(guest.copy(hidden = if (allowed) guest.hidden - entityId else guest.hidden + entityId))
+    }
+
+    /** Adds or removes a device from another room. */
+    fun setGuestExtra(entityId: String, included: Boolean) {
+        val guest = config.value.guest
+        kiosk.setGuest(guest.copy(extras = if (included) guest.extras + entityId else guest.extras - entityId))
     }
 }
 

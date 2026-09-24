@@ -20,7 +20,8 @@ data class ControlError(val name: String, val notConnected: Boolean)
 
 /** Sends the controls screen's actions to Home Assistant. The screen updates from the resulting state changes. */
 class ControlsViewModel(application: Application) : AndroidViewModel(application) {
-    private val home = (application as SmartDisplayApp).home
+    private val app = application as SmartDisplayApp
+    private val home = app.home
 
     private val _errors = MutableSharedFlow<ControlError>(
         extraBufferCapacity = 4,
@@ -29,6 +30,13 @@ class ControlsViewModel(application: Application) : AndroidViewModel(application
     val errors: SharedFlow<ControlError> = _errors.asSharedFlow()
 
     fun call(call: ServiceCall, name: String) {
+        // Guest mode: refuse anything outside the guest's devices, even if a screen offered it.
+        val kiosk = app.kiosk.config.value
+        if (kiosk.isGuest && call.entityId !in home.state.value.rooms().guestEntityIds(kiosk.guest)) {
+            Log.w(TAG, "Refused ${call.domain}.${call.service} on ${call.entityId}: not a guest device")
+            _errors.tryEmit(ControlError(name, notConnected = false))
+            return
+        }
         viewModelScope.launch {
             try {
                 home.callService(

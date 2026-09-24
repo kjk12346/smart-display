@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -51,6 +52,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.smartdisplay.app.R
 import dev.smartdisplay.app.ha.ConnectionStatus
 import dev.smartdisplay.app.ha.HomeState
+import dev.smartdisplay.app.kiosk.GuestConfig
 import kotlinx.coroutines.delay
 
 /** After this long without a touch, the display goes back to the clock. */
@@ -65,11 +67,13 @@ private val Room.key: String get() = id ?: OTHER_ROOM_KEY
 
 /**
  * Room-by-room controls for lights, switches, media players and thermostats. Goes back to the clock on Done, Back,
- * or after [IDLE_RETURN_MS] without a touch.
+ * or after [IDLE_RETURN_MS] without a touch. With a [guest] configuration, shows only the guest's room and extras,
+ * with no way to reach other rooms.
  */
 @Composable
 fun ControlsScreen(
     home: HomeState,
+    guest: GuestConfig?,
     onDone: () -> Unit,
     onOpenSettings: () -> Unit,
     viewModel: ControlsViewModel = viewModel(),
@@ -97,7 +101,13 @@ fun ControlsScreen(
         Surface(modifier = Modifier.fillMaxSize()) {
             BoxWithConstraints(modifier = Modifier.safeDrawingPadding()) {
                 val roomName = selected?.name ?: stringResource(R.string.controls_other_room)
-                if (maxWidth >= SIDE_LIST_MIN_WIDTH) {
+                if (guest != null) {
+                    val guestRooms = remember(rooms, guest) { rooms.forGuest(guest) }
+                    Column {
+                        Header(guestRooms.firstOrNull { it.id == guest.areaId }?.name, home, onDone, onOpenSettings)
+                        GuestGrid(home, guestRooms, ownAreaId = guest.areaId, onCall = call)
+                    }
+                } else if (maxWidth >= SIDE_LIST_MIN_WIDTH) {
                     Row {
                         RoomList(
                             rooms = rooms,
@@ -206,6 +216,44 @@ private fun RoomGrid(home: HomeState, room: Room?, onCall: (ServiceCall, String)
     ) {
         items(room.controls, key = { it.entityId }) { control ->
             ControlCard(control, home.config?.temperatureUnit) { onCall(it, control.name) }
+        }
+    }
+}
+
+/** A guest's controls: their room's cards, then each other room's extras under that room's name. */
+@Composable
+private fun GuestGrid(home: HomeState, rooms: List<Room>, ownAreaId: String?, onCall: (ServiceCall, String) -> Unit) {
+    if (rooms.isEmpty()) {
+        Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Text(
+                text = stringResource(if (home.loaded) R.string.controls_guest_not_set_up else R.string.live_connecting),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+    val otherName = stringResource(R.string.controls_other_room)
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 240.dp),
+        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 96.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        rooms.forEach { room ->
+            if (room.id == null || room.id != ownAreaId) {
+                item(key = "header:${room.key}", span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        text = room.name ?: otherName,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                }
+            }
+            items(room.controls, key = { it.entityId }) { control ->
+                ControlCard(control, home.config?.temperatureUnit) { onCall(it, control.name) }
+            }
         }
     }
 }

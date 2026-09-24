@@ -179,6 +179,7 @@ private fun AppContent(app: SmartDisplayApp) {
                 )
                 Screen.Controls -> ControlsScreen(
                     home = home,
+                    guest = kiosk.guest.takeIf { kiosk.isGuest },
                     onDone = { screen = Screen.Ambient },
                     onOpenSettings = openSettings,
                 )

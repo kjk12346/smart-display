@@ -37,6 +37,7 @@ import dev.smartdisplay.app.kiosk.DIM_AFTER_CHOICES
 import dev.smartdisplay.app.server.SavedServer
 import dev.smartdisplay.app.ui.common.Panel
 import dev.smartdisplay.app.ui.common.PanelBody
+import dev.smartdisplay.app.ui.controls.rooms
 import dev.smartdisplay.app.ui.signin.displayName
 import kotlinx.coroutines.launch
 
@@ -55,6 +56,7 @@ fun SettingsScreen(
     BackHandler(onBack = onBack)
     val kiosk by viewModel.config.collectAsStateWithLifecycle()
     var problem by remember { mutableStateOf<KioskProblem?>(null) }
+    var modeProblem by remember { mutableStateOf<KioskProblem?>(null) }
     var settingPin by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -70,6 +72,19 @@ fun SettingsScreen(
                 ).joinToString(", ")
             )
         }
+
+        Section(stringResource(R.string.settings_mode))
+        val rooms = remember(home.entities, home.areas, home.devices, home.registry) { home.rooms() }
+        GuestSettings(
+            kiosk = kiosk,
+            areas = home.areas,
+            rooms = rooms,
+            onMode = { modeProblem = viewModel.setMode(it) },
+            onArea = viewModel::setGuestArea,
+            onAllowed = viewModel::setGuestAllowed,
+            onExtra = viewModel::setGuestExtra,
+        )
+        modeProblem?.let { ProblemText(it) }
 
         Section(stringResource(R.string.settings_display))
         SwitchRow(
@@ -138,20 +153,7 @@ fun SettingsScreen(
             checked = kiosk.pinApp,
             onCheckedChange = { problem = viewModel.setPinApp(it) },
         )
-        problem?.let {
-            Text(
-                text = stringResource(
-                    when (it) {
-                        KioskProblem.NeedsPin -> R.string.settings_needs_pin
-                        KioskProblem.NoHomeChooser -> R.string.settings_no_home_chooser
-                        KioskProblem.PinInUse -> R.string.settings_pin_in_use
-                    }
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
+        problem?.let { ProblemText(it) }
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 32.dp)) {
             Button(onClick = onBack) {
@@ -170,11 +172,28 @@ fun SettingsScreen(
                     viewModel.setPin(pin)
                     settingPin = false
                     problem = null
+                    modeProblem = null
                 }
             },
             onDismiss = { settingPin = false },
         )
     }
+}
+
+@Composable
+private fun ProblemText(problem: KioskProblem) {
+    Text(
+        text = stringResource(
+            when (problem) {
+                KioskProblem.NeedsPin -> R.string.settings_needs_pin
+                KioskProblem.NoHomeChooser -> R.string.settings_no_home_chooser
+                KioskProblem.PinInUse -> R.string.settings_pin_in_use
+            }
+        ),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.error,
+        modifier = Modifier.padding(top = 12.dp),
+    )
 }
 
 @Composable

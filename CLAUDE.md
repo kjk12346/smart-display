@@ -4,8 +4,23 @@ An Android app that turns an old tablet into a Nest Hub–style smart display fo
 Home Assistant, and get an always-on screen with a clock, weather, room controls and (later) voice. Nothing to build
 or configure by hand, unlike a dashboard in a kiosk browser.
 
-All v0.1 steps (1–7) are built. Still to check on devices before calling v0.1 done: controls against real devices,
-landscape layouts, screen pinning, Home app, and anything on an old or Fire tablet.
+All v0.1 steps (1–7) are built, plus guest-room mode (below). The owner has checked screen pinning, Home app and
+landscape on a device (2026-09-24). Still to check: controls against real devices, guest mode on a device, the
+first-run flow of a release build, and anything on an old or Fire tablet. A test release APK went to a second
+household's Home Assistant.
+
+## Guest-room mode (added after v0.1 step 7)
+
+- Settings > "Who uses this display": Owner (all rooms) or Guest room. Guest mode needs the exit PIN (like Home app
+  and pinning), so switching back is always behind it.
+- A guest display has one Home Assistant area: everything controllable there shows unless the owner unticks it, and
+  new devices in that area appear automatically. The owner can add individual devices from other areas (e.g. a shared
+  bathroom speaker); those appear under their area's name. Stored in `kiosk/GuestConfig.kt` via `KioskStore`;
+  filtering in `ui/controls/GuestModel.kt`.
+- The guest's controls screen has no room list. `ControlsViewModel.call()` also refuses any entity outside the guest's
+  set. This is a limit in the app, not a security boundary: the tablet's Home Assistant account can still reach
+  everything, and Home Assistant has no per-entity permissions. Settings suggests a separate non-admin user.
+- Standalone: not tied to guest-panel passes (decided 2026-09-24).
 
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
 `CLAUDE.local.md`, which is not committed. Keep personal details out of committed files and commit messages.
@@ -96,7 +111,7 @@ landscape layouts, screen pinning, Home app, and anything on an old or Fire tabl
   the battery sitting at 100%).
 - Device-owner kiosk (set up once over adb), boot start, foreground service, proximity wake, night schedule.
 - Doorbell/camera pop-ups. Assist voice: push-to-talk first, wake word much later.
-- Optional "guest room" mode, tied to the owner's guest-panel project.
+- Possibly: link guest-room mode to the owner's guest-panel project (its passes).
 - Release: Play Console (personal accounts need a 12-tester, 14-day closed test first), privacy policy, data-safety
   form; Amazon Appstore for Fire tablets; direct APK.
 

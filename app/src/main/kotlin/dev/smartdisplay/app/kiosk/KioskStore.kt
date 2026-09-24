@@ -1,6 +1,7 @@
 package dev.smartdisplay.app.kiosk
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,9 +17,13 @@ data class KioskConfig(
     /** Screen pinning while the display is showing. */
     val pinApp: Boolean = false,
     val hasPin: Boolean = false,
+    val mode: DisplayMode = DisplayMode.Owner,
+    val guest: GuestConfig = GuestConfig(),
 ) {
-    /** Home app or pinning is on: the display shouldn't be left without the PIN. */
-    val locked: Boolean get() = homeApp || pinApp
+    val isGuest: Boolean get() = mode == DisplayMode.Guest
+
+    /** Home app, pinning or guest mode is on: the display shouldn't be left without the PIN. */
+    val locked: Boolean get() = homeApp || pinApp || isGuest
 }
 
 /** Choices offered for [KioskConfig.dimAfterMinutes]. */
@@ -39,6 +44,14 @@ class KioskStore(context: Context) {
 
     fun setPinApp(on: Boolean) = update { putBoolean(KEY_PIN_APP, on) }
 
+    fun setMode(mode: DisplayMode) = update { putString(KEY_MODE, mode.name) }
+
+    fun setGuest(guest: GuestConfig) = update {
+        putString(KEY_GUEST_AREA, guest.areaId)
+        putStringSet(KEY_GUEST_HIDDEN, guest.hidden)
+        putStringSet(KEY_GUEST_EXTRAS, guest.extras)
+    }
+
     fun setPin(pin: String) {
         val stored = ExitPin.hash(pin)
         update {
@@ -47,7 +60,7 @@ class KioskStore(context: Context) {
         }
     }
 
-    /** Removes the PIN; refused (false) while Home app or pinning is on, which need it. */
+    /** Removes the PIN; refused (false) while Home app, pinning or guest mode is on, which need it. */
     fun removePin(): Boolean {
         if (_config.value.locked) return false
         update {
@@ -68,7 +81,7 @@ class KioskStore(context: Context) {
         return StoredPin(salt, hash)
     }
 
-    private fun update(change: android.content.SharedPreferences.Editor.() -> Unit) {
+    private fun update(change: SharedPreferences.Editor.() -> Unit) {
         prefs.edit(action = change)
         _config.value = load()
     }
@@ -79,6 +92,13 @@ class KioskStore(context: Context) {
         homeApp = prefs.getBoolean(KEY_HOME, false),
         pinApp = prefs.getBoolean(KEY_PIN_APP, false),
         hasPin = prefs.contains(KEY_PIN_HASH),
+        mode = DisplayMode.entries.firstOrNull { it.name == prefs.getString(KEY_MODE, null) } ?: DisplayMode.Owner,
+        guest = GuestConfig(
+            areaId = prefs.getString(KEY_GUEST_AREA, null),
+            // Copies: the sets SharedPreferences returns mustn't be kept or changed.
+            hidden = prefs.getStringSet(KEY_GUEST_HIDDEN, null)?.toSet().orEmpty(),
+            extras = prefs.getStringSet(KEY_GUEST_EXTRAS, null)?.toSet().orEmpty(),
+        ),
     )
 
     private companion object {
@@ -88,5 +108,9 @@ class KioskStore(context: Context) {
         const val KEY_PIN_APP = "pin_app"
         const val KEY_PIN_SALT = "pin_salt"
         const val KEY_PIN_HASH = "pin_hash"
+        const val KEY_MODE = "mode"
+        const val KEY_GUEST_AREA = "guest_area"
+        const val KEY_GUEST_HIDDEN = "guest_hidden"
+        const val KEY_GUEST_EXTRAS = "guest_extras"
     }
 }
