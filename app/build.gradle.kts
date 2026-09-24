@@ -1,6 +1,12 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+}
+
+val keystoreProps: Properties? = rootProject.file("keystore.properties").takeIf { it.exists() }?.let { file ->
+    Properties().apply { file.inputStream().use(::load) }
 }
 
 android {
@@ -19,9 +25,26 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        // A real release key, when keystore.properties (not committed) exists.
+        if (keystoreProps != null) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Test builds for sharing are signed with this PC's debug key until there's a release key; installs of
+            // one can only be updated by a build signed with the same key.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 

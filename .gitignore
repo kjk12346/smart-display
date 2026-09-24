@@ -11,3 +11,5 @@ keystore.properties
 *.keystore
 # Owner-specific notes for Claude Code; never commit.
 CLAUDE.local.md
+# Built APKs for sharing.
+dist/
