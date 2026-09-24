@@ -44,7 +44,6 @@ import dev.smartdisplay.app.R
 import dev.smartdisplay.app.ha.ConnectionStatus
 import dev.smartdisplay.app.ha.DisconnectReason
 import dev.smartdisplay.app.ha.HomeState
-import dev.smartdisplay.app.ui.common.HideSystemBars
 import dev.smartdisplay.app.ui.common.ScreenBrightness
 import dev.smartdisplay.app.ui.common.rememberMinuteClock
 import dev.smartdisplay.app.ui.theme.SmartDisplayTheme
@@ -59,11 +58,16 @@ private const val NIGHT_BRIGHTNESS = 0.08f
 private const val NIGHT_CONTENT_ALPHA = 0.55f
 
 /**
- * The display's resting screen: a large clock, the date and the weather. Long-press opens settings. The whole layout
- * drifts a few dp each minute against burn-in, and dims during quiet hours.
+ * The display's resting screen: a large clock, the date and the weather. Tap opens the controls, long-press settings.
+ * The whole layout drifts a few dp each minute against burn-in, and dims during quiet hours.
  */
 @Composable
-fun AmbientScreen(home: HomeState, onOpenSettings: () -> Unit, viewModel: AmbientViewModel = viewModel()) {
+fun AmbientScreen(
+    home: HomeState,
+    onOpenControls: () -> Unit,
+    onOpenSettings: () -> Unit,
+    viewModel: AmbientViewModel = viewModel(),
+) {
     val weather = home.primaryWeatherEntity()?.toCurrentWeather()
     val connected = home.status == ConnectionStatus.Connected
 
@@ -80,7 +84,6 @@ fun AmbientScreen(home: HomeState, onOpenSettings: () -> Unit, viewModel: Ambien
     val now by rememberMinuteClock()
     val quiet = isQuietHours(now.toLocalTime())
     ScreenBrightness(if (quiet) NIGHT_BRIGHTNESS else null)
-    HideSystemBars()
 
     AmbientContent(
         now = now,
@@ -90,6 +93,7 @@ fun AmbientScreen(home: HomeState, onOpenSettings: () -> Unit, viewModel: Ambien
         dimmed = quiet,
         status = home.status,
         loaded = home.loaded,
+        onTap = onOpenControls,
         onLongPress = onOpenSettings,
     )
 }
@@ -103,6 +107,7 @@ private fun AmbientContent(
     dimmed: Boolean,
     status: ConnectionStatus,
     loaded: Boolean,
+    onTap: () -> Unit,
     onLongPress: () -> Unit,
 ) {
     val epochMinute = now.toLocalDate().toEpochDay() * 1_440 + now.hour * 60 + now.minute
@@ -115,7 +120,9 @@ private fun AmbientContent(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .pointerInput(onLongPress) { detectTapGestures(onLongPress = { onLongPress() }) },
+            .pointerInput(onTap, onLongPress) {
+                detectTapGestures(onTap = { onTap() }, onLongPress = { onLongPress() })
+            },
     ) {
         val landscape = maxWidth > maxHeight
         // The clock's digit height drives everything else's size.
@@ -298,6 +305,7 @@ private fun AmbientLandscapePreview() {
             dimmed = false,
             status = ConnectionStatus.Connected,
             loaded = true,
+            onTap = {},
             onLongPress = {},
         )
     }
@@ -315,6 +323,7 @@ private fun AmbientPortraitPreview() {
             dimmed = true,
             status = ConnectionStatus.Waiting(0, DisconnectReason.Unreachable),
             loaded = true,
+            onTap = {},
             onLongPress = {},
         )
     }

@@ -3,6 +3,8 @@ package dev.smartdisplay.app.ha
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -157,6 +159,22 @@ class HomeAssistantClientTest {
         assertEquals("true", sent["return_response"]!!.jsonPrimitive.content)
         assertEquals("daily", sent["service_data"]!!.jsonObject["type"]!!.jsonPrimitive.content)
         assertEquals("weather.home", sent["target"]!!.jsonObject["entity_id"]!!.jsonPrimitive.content)
+        keepConnected.cancel()
+    }
+
+    @Test
+    fun `many commands at once reach Home Assistant in id order`() = runBlocking {
+        fake.acceptConnection()
+        val client = client(FakeTokens("good"))
+        val keepConnected = launch { client.state.collect {} }
+        client.awaitState { it.isLive() }
+
+        // From several threads at once, as the screens do.
+        val results = (1..200).map {
+            async(Dispatchers.Default) { client.command("get_config") }
+        }.awaitAll()
+        assertEquals(200, results.size)
+        assertEquals(ConnectionStatus.Connected, client.state.value.status)
         keepConnected.cancel()
     }
 

@@ -33,6 +33,11 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // android.util.Log (and other framework calls) do nothing in JVM unit tests instead of throwing.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {

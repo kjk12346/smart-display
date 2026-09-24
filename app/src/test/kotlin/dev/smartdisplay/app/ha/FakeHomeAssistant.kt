@@ -29,6 +29,7 @@ class FakeHomeAssistant(private val validTokens: Set<String> = setOf("good")) : 
     val received = CopyOnWriteArrayList<JsonObject>()
     private val sockets = CopyOnWriteArrayList<WebSocket>()
     private val subscriptions = ConcurrentHashMap<String, Pair<WebSocket, Int>>()
+    private val lastIds = ConcurrentHashMap<WebSocket, Int>()
 
     val url: String get() = server.url("/").toString().trimEnd('/')
 
@@ -73,6 +74,23 @@ class FakeHomeAssistant(private val validTokens: Set<String> = setOf("good")) : 
         val message = Json.parseToJsonElement(text).jsonObject
         received += message
         val id = message["id"]?.jsonPrimitive?.content?.toInt()
+        // Like Home Assistant: each command's id must be higher than the last one on this connection.
+        if (id != null) {
+            val last = lastIds[webSocket] ?: 0
+            if (id <= last) {
+                webSocket.send(buildJsonObject {
+                    put("id", id)
+                    put("type", "result")
+                    put("success", false)
+                    putJsonObject("error") {
+                        put("code", "id_reuse")
+                        put("message", "Identifier values have to increase.")
+                    }
+                }.toString())
+                return
+            }
+            lastIds[webSocket] = id
+        }
         when (message.type) {
             "auth" -> if (message["access_token"]!!.jsonPrimitive.content in validTokens) {
                 webSocket.send("""{"type":"auth_ok","ha_version":"2026.9.3"}""")

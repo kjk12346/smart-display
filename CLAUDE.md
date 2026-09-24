@@ -4,8 +4,8 @@ An Android app that turns an old tablet into a Nest Hub–style smart display fo
 Home Assistant, and get an always-on screen with a clock, weather, room controls and (later) voice. Nothing to build
 or configure by hand, unlike a dashboard in a kiosk browser.
 
-v0.1 steps 1 (project scaffold), 2 (find Home Assistant), 3 (sign in), 4 (live connection) and 5 (ambient screen)
-are done; continue with step 6.
+v0.1 steps 1–6 (scaffold, find Home Assistant, sign in, live connection, ambient screen, controls) are done;
+continue with step 7.
 
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
 `CLAUDE.local.md`, which is not committed. Keep personal details out of committed files and commit messages.
@@ -73,6 +73,12 @@ are done; continue with step 6.
      free for the controls screen.
 6. **Controls screen**: rooms from Home Assistant areas; native cards for lights (on/off, brightness), switches/plugs,
    media players (play/pause, volume hidden until the name is tapped), thermostats (mode, setpoints).
+   - **Done:** `ui/controls/`. Tap the clock to open; Done, Back or 2 minutes idle returns. Rooms come from areas
+     (entity's area, else its device's), plus "Other"; hidden, disabled and config/diagnostic entities are skipped.
+     Names drop the room prefix and a doubled device name. No optimistic UI: cards follow Home Assistant's state
+     events; sliders and thermostat steppers hold the sent value until the state confirms it (or 5 s).
+   - Home Assistant rejects a command id lower than one it has seen (`id_reuse`); `LiveConnection.command()` numbers
+     and queues under one lock for that reason. `FakeHomeAssistant` enforces the same rule.
 7. **Kiosk basics** (the owner's earlier kiosk app shows how; see `CLAUDE.local.md`): keep screen on, use as Home app,
    screen pinning, PIN to exit settings, dim when idle (first tap only wakes).
 

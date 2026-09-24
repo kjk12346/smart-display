@@ -54,6 +54,29 @@
     <string name="ambient_high">H %1$s</string>
     <string name="ambient_low">L %1$s</string>
 
+    <string name="controls_other_room">Other</string>
+    <string name="controls_empty">Nothing to control yet. Lights, switches, media players and thermostats in Home Assistant show up here.</string>
+    <string name="controls_error_not_connected">Not connected to Home Assistant.</string>
+    <string name="controls_error_failed">Couldn\'t control %1$s.</string>
+    <string name="control_on">On</string>
+    <string name="control_off">Off</string>
+    <string name="control_on_percent">On · %1$d%%</string>
+    <string name="control_unavailable">Unavailable</string>
+    <string name="media_idle">Idle</string>
+    <string name="media_standby">Standby</string>
+    <string name="media_playing">Playing</string>
+    <string name="media_paused">Paused</string>
+    <string name="media_buffering">Buffering</string>
+    <string name="climate_now">Now %1$s</string>
+    <string name="climate_heat_to">Heat to</string>
+    <string name="climate_cool_to">Cool to</string>
+    <string name="hvac_heat">Heat</string>
+    <string name="hvac_cool">Cool</string>
+    <string name="hvac_heat_cool">Heat/Cool</string>
+    <string name="hvac_auto">Auto</string>
+    <string name="hvac_dry">Dry</string>
+    <string name="hvac_fan_only">Fan</string>
+
     <!-- Home Assistant weather conditions. -->
     <string name="weather_clear">Clear</string>
     <string name="weather_sunny">Sunny</string>

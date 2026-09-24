@@ -1,9 +1,9 @@
 package dev.smartdisplay.app.ha
 
+import android.util.Log
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
@@ -155,14 +155,18 @@ class HomeAssistantClient(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: ProtocolException) {
+                Log.w(TAG, "Protocol error", e)
                 DisconnectReason.Protocol
             } catch (e: CommandFailedException) {
+                Log.w(TAG, "Command failed while connecting", e)
                 DisconnectReason.Protocol
             } catch (e: IOException) {
+                Log.w(TAG, "Connection failed or dropped: $e")
                 DisconnectReason.Unreachable
             }
             attempt++
             val wait = backoff.delayMillis(attempt)
+            Log.i(TAG, "Retrying in $wait ms ($reason, attempt $attempt)")
             _state.update {
                 it.copy(status = ConnectionStatus.Waiting(System.currentTimeMillis() + wait, reason))
             }
@@ -185,6 +189,7 @@ class HomeAssistantClient(
                     val reader = launch { connection.readUntilClosed() }
                     loadAndSubscribe(connection, this)
                     _state.update { it.copy(status = ConnectionStatus.Connected) }
+                    Log.i(TAG, "Connected")
                     onReady()
                     reader.join()
                 }
@@ -267,7 +272,8 @@ class HomeAssistantClient(
 
     /** An authenticated connection: numbers commands, matches results to them, and routes events. */
     private class LiveConnection(private val socket: WebSocketChannel) {
-        private val nextId = AtomicInteger(1)
+        private val sendLock = Any()
+        private var nextId = 1
         private val pending = ConcurrentHashMap<Int, CompletableDeferred<JsonElement>>()
         private val subscriptions = ConcurrentHashMap<Int, (JsonObject) -> Unit>()
 
@@ -277,14 +283,20 @@ class HomeAssistantClient(
             fields: JsonObject = JsonObject(emptyMap()),
             onEvent: ((JsonObject) -> Unit)? = null,
         ): JsonElement {
-            val id = nextId.getAndIncrement()
             val result = CompletableDeferred<JsonElement>()
-            pending[id] = result
-            // Registered before sending: events can follow the result immediately.
-            if (onEvent != null) subscriptions[id] = onEvent
+            val id: Int
+            val sent: Boolean
+            // Home Assistant rejects an id lower than one it has already seen ("id_reuse"), so numbering and queueing
+            // for sending happen together. OkHttp's send only queues, so this lock is never held for long.
+            synchronized(sendLock) {
+                id = nextId++
+                pending[id] = result
+                // Registered before sending: events can follow the result immediately.
+                if (onEvent != null) subscriptions[id] = onEvent
+                sent = socket.send(JsonObject(fields + mapOf("id" to JsonPrimitive(id), "type" to JsonPrimitive(type))))
+            }
             try {
-                val message = JsonObject(fields + mapOf("id" to JsonPrimitive(id), "type" to JsonPrimitive(type)))
-                if (!socket.send(message)) throw NotConnectedException()
+                if (!sent) throw NotConnectedException()
                 return result.await()
             } catch (e: Exception) {
                 subscriptions.remove(id)
@@ -337,6 +349,7 @@ class HomeAssistantClient(
     }
 
     private companion object {
+        const val TAG = "HomeAssistantClient"
         const val STOP_DELAY_MS = 5_000L
         const val AUTH_TIMEOUT_MS = 15_000L
         const val PING_INTERVAL_S = 20L

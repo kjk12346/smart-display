@@ -17,8 +17,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.smartdisplay.app.auth.REDIRECT_URI
 import dev.smartdisplay.app.auth.SessionState
 import dev.smartdisplay.app.ui.ambient.AmbientScreen
+import dev.smartdisplay.app.ui.common.HideSystemBars
 import dev.smartdisplay.app.ui.common.LocalNetworkPrompt
 import dev.smartdisplay.app.ui.common.rememberLocalNetworkAccess
+import dev.smartdisplay.app.ui.controls.ControlsScreen
 import dev.smartdisplay.app.ui.settings.SettingsScreen
 import dev.smartdisplay.app.ui.setup.SetupScreen
 import dev.smartdisplay.app.ui.signin.SignInScreen
@@ -72,19 +74,29 @@ private fun AppContent(app: SmartDisplayApp) {
         session == SessionState.SignedIn -> {
             // Collecting keeps the live connection open while these screens are showing.
             val home by app.home.state.collectAsStateWithLifecycle()
-            var showSettings by rememberSaveable { mutableStateOf(false) }
-            if (showSettings) {
-                SettingsScreen(
+            // Full screen for the whole display, not per screen: switching screens would briefly show the bars.
+            HideSystemBars()
+            var screen by rememberSaveable { mutableStateOf(Screen.Ambient) }
+            when (screen) {
+                Screen.Ambient -> AmbientScreen(
+                    home = home,
+                    onOpenControls = { screen = Screen.Controls },
+                    onOpenSettings = { screen = Screen.Settings },
+                )
+                Screen.Controls -> ControlsScreen(
+                    home = home,
+                    onDone = { screen = Screen.Ambient },
+                    onOpenSettings = { screen = Screen.Settings },
+                )
+                Screen.Settings -> SettingsScreen(
                     server = current,
                     home = home,
-                    onBack = { showSettings = false },
+                    onBack = { screen = Screen.Ambient },
                     onSignOut = {
-                        showSettings = false
+                        screen = Screen.Ambient
                         scope.launch { app.session.signOut() }
                     },
                 )
-            } else {
-                AmbientScreen(home = home, onOpenSettings = { showSettings = true })
             }
         }
         else -> SignInScreen(
@@ -95,3 +107,6 @@ private fun AppContent(app: SmartDisplayApp) {
         )
     }
 }
+
+/** The screens once signed in. */
+private enum class Screen { Ambient, Controls, Settings }
