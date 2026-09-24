@@ -5,6 +5,7 @@ import dev.smartdisplay.app.auth.AuthStore
 import dev.smartdisplay.app.auth.HomeAssistantAuth
 import dev.smartdisplay.app.auth.Session
 import dev.smartdisplay.app.ha.HomeAssistantClient
+import dev.smartdisplay.app.kiosk.KioskStore
 import dev.smartdisplay.app.server.ServerStore
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -18,6 +19,8 @@ class SmartDisplayApp : Application() {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val serverStore by lazy { ServerStore(this) }
+
+    val kiosk by lazy { KioskStore(this) }
 
     val http: OkHttpClient by lazy {
         OkHttpClient.Builder()

@@ -34,5 +34,18 @@
                     android:scheme="smartdisplay" />
             </intent-filter>
         </activity>
+
+        <!-- "Use as Home app" in Settings turns this on (kiosk/HomeApp.kt), so the display can open on startup. -->
+        <activity-alias
+            android:name=".HomeAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

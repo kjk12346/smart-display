@@ -39,14 +39,43 @@
 
     <string name="settings_eyebrow">Settings</string>
     <string name="settings_done">Done</string>
+    <string name="cancel">Cancel</string>
+    <string name="settings_display">Display</string>
+    <string name="settings_keep_on">Keep screen on</string>
+    <string name="settings_keep_on_body">The screen stays on while this app is showing.</string>
+    <string name="settings_dim_after">Dim when idle</string>
+    <string name="settings_dim_after_body">After this long without a touch, the screen dims. The first tap only wakes it.</string>
+    <string name="settings_dim_never">Never</string>
+    <string name="settings_dim_minutes">%1$d min</string>
+    <string name="settings_kiosk">Kiosk</string>
+    <string name="settings_exit_pin">Exit PIN</string>
+    <string name="settings_pin_set">Settings ask for the PIN. It\'s the way out of the Home app and pinning.</string>
+    <string name="settings_pin_unset">No PIN. Set one before using this as the Home app or pinning it.</string>
+    <string name="settings_pin_create">Set PIN</string>
+    <string name="settings_pin_change">Change PIN</string>
+    <string name="settings_pin_remove">Remove PIN</string>
+    <string name="settings_home_app">Use as Home app</string>
+    <string name="settings_home_app_body">Opens on startup and when Home is pressed. Android asks you to choose it.</string>
+    <string name="settings_pin_app">Pin the app</string>
+    <string name="settings_pin_app_body">Keeps people in this app. Opening settings with the PIN unpins it.</string>
+    <string name="settings_needs_pin">Set an exit PIN first, so there\'s a way out.</string>
+    <string name="settings_no_home_chooser">This device doesn\'t let you choose a Home app here. Press Home to see if Android offers it.</string>
+    <string name="settings_pin_in_use">Turn off Home app and pinning before removing the PIN.</string>
+    <string name="pin_enter_title">Enter exit PIN</string>
+    <string name="pin_label">PIN</string>
+    <string name="pin_open_settings">Open settings</string>
+    <string name="pin_wrong">Wrong PIN.</string>
+    <string name="pin_set_title">Set exit PIN</string>
+    <string name="pin_new_label">New PIN (4 to 8 digits)</string>
+    <string name="pin_again_label">Type it again</string>
+    <string name="pin_format">Use 4 to 8 digits.</string>
+    <string name="pin_mismatch">The PINs don\'t match.</string>
+    <string name="pin_save">Save</string>
     <string name="live_connecting">Connecting…</string>
     <string name="live_connected">Live: %1$s, Home Assistant %2$s.</string>
     <string name="live_waiting_unreachable">Home Assistant isn\'t answering. Trying again shortly…</string>
     <string name="live_waiting_rejected">Home Assistant refused this display\'s sign-in. Trying again shortly…</string>
     <string name="live_waiting_protocol">Home Assistant sent something unexpected. Trying again shortly…</string>
-    <string name="live_counts">%1$d entities, %2$d areas, %3$d devices.</string>
-    <string name="live_no_changes">Waiting for the first change…</string>
-    <string name="live_last_change">Latest change: %1$s is now %2$s.</string>
     <string name="sign_out">Sign out</string>
 
     <string name="ambient_reconnecting">Reconnecting to Home Assistant…</string>
@@ -92,4 +121,21 @@
     <string name="weather_windy">Windy</string>
     <string name="weather_windy_cloudy">Windy and cloudy</string>
     <string name="weather_exceptional">Unusual weather</string>
+
+    <plurals name="pin_locked_out">
+        <item quantity="one">Too many tries. Wait %1$d second.</item>
+        <item quantity="other">Too many tries. Wait %1$d seconds.</item>
+    </plurals>
+    <plurals name="count_entities">
+        <item quantity="one">%1$d entity</item>
+        <item quantity="other">%1$d entities</item>
+    </plurals>
+    <plurals name="count_areas">
+        <item quantity="one">%1$d area</item>
+        <item quantity="other">%1$d areas</item>
+    </plurals>
+    <plurals name="count_devices">
+        <item quantity="one">%1$d device</item>
+        <item quantity="other">%1$d devices</item>
+    </plurals>
 </resources>

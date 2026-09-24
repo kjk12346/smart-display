@@ -4,8 +4,8 @@ An Android app that turns an old tablet into a Nest Hub–style smart display fo
 Home Assistant, and get an always-on screen with a clock, weather, room controls and (later) voice. Nothing to build
 or configure by hand, unlike a dashboard in a kiosk browser.
 
-v0.1 steps 1–6 (scaffold, find Home Assistant, sign in, live connection, ambient screen, controls) are done;
-continue with step 7.
+All v0.1 steps (1–7) are built. Still to check on devices before calling v0.1 done: controls against real devices,
+landscape layouts, screen pinning, Home app, and anything on an old or Fire tablet.
 
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
 `CLAUDE.local.md`, which is not committed. Keep personal details out of committed files and commit messages.
@@ -81,6 +81,12 @@ continue with step 7.
      and queues under one lock for that reason. `FakeHomeAssistant` enforces the same rule.
 7. **Kiosk basics** (the owner's earlier kiosk app shows how; see `CLAUDE.local.md`): keep screen on, use as Home app,
    screen pinning, PIN to exit settings, dim when idle (first tap only wakes).
+   - **Done:** options in `kiosk/KioskStore.kt`, shown in Settings. Exit PIN is 4–8 digits, PBKDF2-hashed, 5 tries
+     then 30 s lockout; with a PIN, opening Settings asks for it. Home app and pinning can't be turned on without a
+     PIN. Pinning is released while Settings is open (the way out). The Home app is the manifest's disabled
+     `HomeAlias`; Fire tablets have no Home app chooser (`ACTION_HOME_SETTINGS`), so that needs the later device-owner
+     or adb route. Idle dim is in `MainActivity.dispatchTouchEvent` (the waking touch is swallowed there, before any
+     screen sees it). All brightness requests go through `WindowBrightness`; the darkest wins.
 
 ## Later (v0.2 and on; don't build in v0.1)
 
