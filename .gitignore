@@ -13,3 +13,4 @@ keystore.properties
 CLAUDE.local.md
 # Built APKs for sharing.
 dist/
+*.zip
