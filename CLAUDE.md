@@ -125,7 +125,10 @@ Home Assistant.
    - **Done:** options in `kiosk/KioskStore.kt`, shown in Settings. Exit PIN is 4–8 digits, PBKDF2-hashed, 5 tries
      then 30 s lockout; with a PIN, opening Settings asks for it. Home app and pinning can't be turned on without a
      PIN. Pinning is released while Settings is open (the way out). The Home app is the manifest's disabled
-     `HomeAlias`; Fire tablets have no Home app chooser (`ACTION_HOME_SETTINGS`), so that needs the later device-owner
+     `HomeAlias`. Android runs it in a separate Home task, so `MainActivity` keeps one display at a time: the
+     Home copy closes any other, an ordinary launch while this is Home goes to Home, and turning Home off reopens an
+     ordinary copy from the Home copy's `onDestroy` (Android applies the alias change about a second later, so the
+     launcher flashes briefly). Fire tablets have no Home app chooser (`ACTION_HOME_SETTINGS`), so that needs the later device-owner
      or adb route. Idle dim is in `MainActivity.dispatchTouchEvent` (the waking touch is swallowed there, before any
      screen sees it). All brightness requests go through `WindowBrightness`; the darkest wins.
 

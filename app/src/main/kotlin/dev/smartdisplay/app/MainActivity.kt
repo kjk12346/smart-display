@@ -24,6 +24,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dev.smartdisplay.app.auth.REDIRECT_URI
 import dev.smartdisplay.app.auth.SessionState
+import dev.smartdisplay.app.kiosk.HomeApp
 import dev.smartdisplay.app.ui.alarms.AlarmsScreen
 import dev.smartdisplay.app.ui.ambient.AmbientScreen
 import dev.smartdisplay.app.ui.common.HideSystemBars
@@ -65,6 +66,18 @@ class MainActivity : ComponentActivity() {
         // Only a fresh launch carries a new sign-in result; after a rotation the intent is the one already handled.
         if (savedInstanceState == null) handleIntent(intent)
 
+        // One display at a time. As the Home app, Android keeps the display in its own Home task, and an ordinary
+        // launch (the app icon, the alarm's clock icon, the sign-in redirect) would start a second copy beside it.
+        // Such a launch goes to the Home one instead, and the Home one closes any copy that was already running.
+        if (intent.hasCategory(Intent.CATEGORY_HOME)) {
+            running.filter { it !== this }.forEach { it.finish() }
+        } else if (HomeApp.isDefault(this)) {
+            startActivity(HomeApp.homeIntent)
+            finish()
+            return
+        }
+        running += this
+
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 app.kiosk.config.map { it.dimAfterMinutes }.distinctUntilChanged().collect { minutes ->
@@ -88,6 +101,20 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
+    }
+
+    override fun onDestroy() {
+        running -= this
+        // The owner turned "Use as Home app" off: Android closes the Home display (a second or so later, once the
+        // alias is off), so open an ordinary one in its place rather than dropping to the launcher. Not when someone
+        // simply chose another Home app in Android's settings: then the display's own setting is still on.
+        if (isFinishing && intent.hasCategory(Intent.CATEGORY_HOME) && !app.kiosk.config.value.homeApp &&
+            !HomeApp.isDefault(this)
+        ) {
+            val ordinary = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            applicationContext.startActivity(ordinary)
+        }
+        super.onDestroy()
     }
 
     override fun onResume() {
@@ -137,6 +164,9 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         val IDLE_DIM = Any()
+
+        /** The displays open now (main thread only): normally one, briefly two while becoming the Home app. */
+        val running = mutableSetOf<MainActivity>()
     }
 }
 

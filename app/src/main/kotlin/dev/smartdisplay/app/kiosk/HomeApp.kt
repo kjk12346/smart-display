@@ -28,6 +28,15 @@ object HomeApp {
         )
     }
 
+    /** The Home intent, which brings back the display when it's the Home app. */
+    val homeIntent: Intent
+        get() = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** Whether Home currently opens this display (the alias is on and the owner chose it in Android's settings). */
+    fun isDefault(context: Context): Boolean =
+        context.packageManager.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            ?.activityInfo?.packageName == context.packageName
+
     /** Opens Android's Home app choice. False if the device has none (Fire tablets don't offer one). */
     fun openHomeChooser(context: Context): Boolean = try {
         context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
