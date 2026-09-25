@@ -29,6 +29,8 @@ Home Assistant.
   (`media_source/browse_media`, then `resolve_media` for a signed URL; `ha/Media.kt`). Chosen in Settings with
   `MediaBrowserDialog`; shuffled rounds without repeats (`PhotoQueue`), each downloaded with Coil before a slow
   crossfade, under a dark gradient; plain black in quiet hours. Only images directly in the folder, not subfolders.
+  The folder is listed again at each round's start and every 10 minutes; added photos join the current round. Each
+  photo slowly pans and zooms (`PanZoom`, 1.05–1.15×, over its interval clamped to 20 s–2 min, then eases back).
 - **Google Photos (planned, owner decided yes):** only via Google's Photos Picker API (since March 2025 apps can't
   read albums); the app keeps copies of picked photos, and new album photos don't appear by themselves. Needs the
   owner's Google Cloud project + Android OAuth client, and Google Play services (so not on Fire tablets). Until

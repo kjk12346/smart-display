@@ -45,9 +45,42 @@ class PhotoQueueTest {
     }
 
     @Test
+    fun `a photo added mid-round shows in that round, not after it`() {
+        val many = List(10) { "p$it" }
+        for (seed in 0 until 20) {
+            val queue = PhotoQueue(Random(seed))
+            val shown = List(3) { queue.next(many)!! }
+            val grown = many + "new"
+            // The rest of this round: the 7 not yet shown, plus the new one.
+            val rest = List(8) { queue.next(grown)!! }
+            assertEquals("seed $seed", (grown - shown.toSet()).toSet(), rest.toSet())
+            assertTrue(queue.roundOver)
+        }
+    }
+
+    @Test
     fun `no photos means no wallpaper, and one photo repeats`() {
         val queue = PhotoQueue()
         assertNull(queue.next(emptyList()))
         assertEquals(listOf("only", "only"), List(2) { queue.next(listOf("only")) })
+    }
+}
+
+class PanZoomTest {
+    @Test
+    fun `a move zooms between the limits and pans across the middle, always within the room it has`() {
+        for (seed in 0 until 50) {
+            val move = PanZoom.random(Random(seed))
+            val start = move.at(0f)
+            val end = move.at(1f)
+            assertEquals(setOf(PanZoom.MIN_ZOOM, PanZoom.MAX_ZOOM), setOf(start.zoom, end.zoom))
+            assertEquals(-start.x, end.x, 1e-6f)
+            assertEquals(-start.y, end.y, 1e-6f)
+            for (step in 0..10) {
+                val framing = move.at(step / 10f)
+                assertTrue(framing.zoom in PanZoom.MIN_ZOOM - 1e-6f..PanZoom.MAX_ZOOM + 1e-6f)
+                assertTrue(framing.x in -1f..1f && framing.y in -1f..1f)
+            }
+        }
     }
 }

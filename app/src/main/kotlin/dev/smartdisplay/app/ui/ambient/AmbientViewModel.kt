@@ -97,7 +97,7 @@ class AmbientViewModel(application: Application) : AndroidViewModel(application)
 
     private suspend fun showNextPhoto(folder: String): Boolean = try {
         val now = System.currentTimeMillis()
-        if (listedFor != folder || now - listedAt >= LIST_REFRESH_MS) {
+        if (listedFor != folder || photoQueue.roundOver || now - listedAt >= LIST_REFRESH_MS) {
             photos = home.browseMedia(folder).children.filter { it.isImage }.map { it.contentId }
             listedFor = folder
             listedAt = now
@@ -132,8 +132,8 @@ class AmbientViewModel(application: Application) : AndroidViewModel(application)
         const val TAG = "AmbientViewModel"
         const val REFRESH_MS = 30 * 60_000L
         const val RETRY_MS = 60_000L
-        /** How often the folder is listed again, to pick up added or removed photos. */
-        const val LIST_REFRESH_MS = 60 * 60_000L
+        /** The folder is listed again at each round's start and at least this often, for added or removed photos. */
+        const val LIST_REFRESH_MS = 10 * 60_000L
     }
 }
 

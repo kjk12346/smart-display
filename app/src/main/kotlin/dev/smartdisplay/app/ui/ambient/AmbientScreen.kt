@@ -3,8 +3,13 @@ package dev.smartdisplay.app.ui.ambient
 import android.text.format.DateFormat
 import androidx.annotation.StringRes
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.EaseInOutSine
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -117,6 +122,7 @@ fun AmbientScreen(
     AmbientContent(
         now = now,
         wallpaperUrl = wallpaperUrl,
+        wallpaperIntervalMillis = wallpaperConfig.intervalMinutes * 60_000L,
         nextAlarm = nextAlarm,
         weather = weather,
         forecast = forecast?.takeIf { it.first == weather?.entityId }?.second,
@@ -133,6 +139,7 @@ fun AmbientScreen(
 private fun AmbientContent(
     now: LocalDateTime,
     wallpaperUrl: String?,
+    wallpaperIntervalMillis: Long,
     nextAlarm: String?,
     weather: CurrentWeather?,
     forecast: DailyForecast?,
@@ -157,7 +164,7 @@ private fun AmbientContent(
                 detectTapGestures(onTap = { onTap() }, onLongPress = { onLongPress() })
             },
     ) {
-        if (wallpaperUrl != null) WallpaperBackground(wallpaperUrl)
+        if (wallpaperUrl != null) WallpaperBackground(wallpaperUrl, wallpaperIntervalMillis)
         val landscape = maxWidth > maxHeight
         // The clock's digit height drives everything else's size.
         val clock = if (landscape) minOf(maxHeight * 0.30f, maxWidth * 0.15f) else minOf(maxWidth * 0.26f, maxHeight * 0.15f)
@@ -209,16 +216,41 @@ private fun AmbientContent(
 
 private const val DRIFT_MS = 4_000
 
-/** A photo filling the screen, faded in over the last one, under a gradient that keeps the clock readable. */
+/** A photo's pan and zoom lasts as long as it's shown, within these limits. */
+private const val MIN_MOVE_MS = 20_000L
+private const val MAX_MOVE_MS = 120_000L
+
+/**
+ * A photo filling the screen, faded in over the last one, under a gradient that keeps the clock readable. Each photo
+ * slowly pans and zooms ([PanZoom]) over the time it's shown; if it stays longer than [MAX_MOVE_MS], the move eases
+ * back and forth.
+ */
 @Composable
-private fun WallpaperBackground(url: String) {
+private fun WallpaperBackground(url: String, intervalMillis: Long) {
     val context = LocalContext.current
+    val moveMillis = intervalMillis.coerceIn(MIN_MOVE_MS, MAX_MOVE_MS).toInt()
     Crossfade(targetState = url, animationSpec = tween(1_500), label = "wallpaper") { shown ->
+        val move = remember(shown) { PanZoom.random() }
+        val progress by rememberInfiniteTransition(label = "panZoom").animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(moveMillis, easing = EaseInOutSine), RepeatMode.Reverse),
+            label = "panZoomProgress",
+        )
         AsyncImage(
             model = wallpaperRequest(context, shown),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    // Read only here, so the move redraws the photo without recomposing the screen.
+                    val framing = move.at(progress)
+                    scaleX = framing.zoom
+                    scaleY = framing.zoom
+                    translationX = framing.x * size.width * (framing.zoom - 1f) / 2f
+                    translationY = framing.y * size.height * (framing.zoom - 1f) / 2f
+                },
         )
     }
     Box(
@@ -363,6 +395,7 @@ private fun AmbientLandscapePreview() {
         AmbientContent(
             now = LocalDateTime.of(2026, 9, 23, 18, 42),
             wallpaperUrl = null,
+            wallpaperIntervalMillis = 60_000L,
             nextAlarm = null,
             weather = CurrentWeather("weather.home", "partlycloudy", 71.6, "°F"),
             forecast = DailyForecast(78.0, 61.0),
@@ -383,6 +416,7 @@ private fun AmbientPortraitPreview() {
         AmbientContent(
             now = LocalDateTime.of(2026, 9, 23, 23, 5),
             wallpaperUrl = null,
+            wallpaperIntervalMillis = 60_000L,
             nextAlarm = null,
             weather = CurrentWeather("weather.home", "rainy", 12.0, "°C"),
             forecast = DailyForecast(15.0, 9.0),
