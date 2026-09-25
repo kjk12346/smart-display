@@ -179,6 +179,26 @@ class HomeAssistantClientTest {
     }
 
     @Test
+    fun `browses media and resolves a file to an absolute signed URL`() = runBlocking {
+        fake.acceptConnection()
+        val client = client(FakeTokens("good"))
+        val keepConnected = launch { client.state.collect {} }
+        client.awaitState { it.isLive() }
+
+        val folder = client.browseMedia("media-source://media_source/local/photos")
+        assertEquals("Photos", folder.item.title)
+        assertEquals(listOf("beach.jpg", "Holidays", "chime.mp3"), folder.children.map { it.title })
+        assertEquals(listOf(true, false, false), folder.children.map { it.isImage })
+        assertEquals(listOf(false, true, false), folder.children.map { it.canExpand })
+        assertTrue(folder.children[2].isAudio)
+
+        val resolved = client.resolveMedia("media-source://media_source/local/photos/beach.jpg")
+        assertEquals("${fake.url}/media/local/photos/beach.jpg?authSig=signed", resolved.url)
+        assertEquals("image/jpeg", resolved.mimeType)
+        keepConnected.cancel()
+    }
+
+    @Test
     fun `a failed command reports Home Assistant's error`() = runBlocking {
         fake.acceptConnection()
         val client = client(FakeTokens("good"))

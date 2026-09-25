@@ -62,6 +62,17 @@
     <string name="settings_dim_after_body">After this long without a touch, the screen dims. The first tap only wakes it.</string>
     <string name="settings_dim_never">Never</string>
     <string name="settings_dim_minutes">%1$d min</string>
+    <string name="wallpaper_title">Wallpaper</string>
+    <string name="wallpaper_none">None. Photos come from a folder in Home Assistant\'s media browser (Media in its sidebar).</string>
+    <string name="wallpaper_folder">Photos from “%1$s”, shuffled. Plain black at night.</string>
+    <string name="wallpaper_choose">Choose folder</string>
+    <string name="wallpaper_remove">Remove</string>
+    <string name="wallpaper_interval">Change photo every</string>
+    <string name="media_title">Media</string>
+    <string name="media_up">‹ Back</string>
+    <string name="media_failed">Couldn\'t open this folder in Home Assistant.</string>
+    <string name="media_empty">Nothing usable here.</string>
+    <string name="media_use_folder">Use this folder</string>
     <string name="settings_kiosk">Kiosk</string>
     <string name="settings_exit_pin">Exit PIN</string>
     <string name="settings_pin_set">Settings ask for the PIN. It\'s the way out of the Home app and pinning.</string>
@@ -153,5 +164,9 @@
     <plurals name="count_devices">
         <item quantity="one">%1$d device</item>
         <item quantity="other">%1$d devices</item>
+    </plurals>
+    <plurals name="media_photo_count">
+        <item quantity="one">%1$d photo in this folder</item>
+        <item quantity="other">%1$d photos in this folder</item>
     </plurals>
 </resources>

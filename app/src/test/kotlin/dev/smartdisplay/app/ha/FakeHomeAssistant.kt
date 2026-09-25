@@ -121,6 +121,43 @@ class FakeHomeAssistant(private val validTokens: Set<String> = setOf("good")) : 
                 // Assigned an area directly.
                 add(buildJsonObject { put("entity_id", "sensor.outside"); put("area_id", "living_room") })
             })
+            "media_source/browse_media" -> webSocket.result(id!!, buildJsonObject {
+                put("title", "Photos")
+                put("media_content_id", message["media_content_id"]!!.jsonPrimitive.content)
+                put("media_class", "directory")
+                put("can_expand", true)
+                put("can_play", false)
+                put("children", buildJsonArray {
+                    add(buildJsonObject {
+                        put("title", "beach.jpg")
+                        put("media_content_id", "media-source://media_source/local/photos/beach.jpg")
+                        put("media_class", "image")
+                        put("media_content_type", "image/jpeg")
+                        put("can_expand", false)
+                        put("can_play", true)
+                    })
+                    add(buildJsonObject {
+                        put("title", "Holidays")
+                        put("media_content_id", "media-source://media_source/local/photos/holidays")
+                        put("media_class", "directory")
+                        put("can_expand", true)
+                        put("can_play", false)
+                    })
+                    add(buildJsonObject {
+                        put("title", "chime.mp3")
+                        put("media_content_id", "media-source://media_source/local/chime.mp3")
+                        put("media_class", "music")
+                        put("media_content_type", "audio/mpeg")
+                        put("can_expand", false)
+                        put("can_play", true)
+                    })
+                })
+            })
+            "media_source/resolve_media" -> webSocket.result(id!!, buildJsonObject {
+                val path = message["media_content_id"]!!.jsonPrimitive.content.substringAfter("media_source")
+                put("url", "/media$path?authSig=signed")
+                put("mime_type", "image/jpeg")
+            })
             "call_service" -> webSocket.result(id!!, buildJsonObject {
                 putJsonObject("context") { put("id", "ctx1") }
                 putJsonObject("response") { put("echo", message["service"]!!) }

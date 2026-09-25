@@ -23,6 +23,21 @@ Home Assistant.
   everything, and Home Assistant has no per-entity permissions. Settings suggests a separate non-admin user.
 - Standalone: not tied to guest-panel passes (decided 2026-09-24).
 
+## Wallpapers and alarms (added 2026-09-24)
+
+- **Wallpapers (done):** photos behind the clock from one folder in Home Assistant's media browser
+  (`media_source/browse_media`, then `resolve_media` for a signed URL; `ha/Media.kt`). Chosen in Settings with
+  `MediaBrowserDialog`; shuffled rounds without repeats (`PhotoQueue`), each downloaded with Coil before a slow
+  crossfade, under a dark gradient; plain black in quiet hours. Only images directly in the folder, not subfolders.
+- **Google Photos (planned, owner decided yes):** only via Google's Photos Picker API (since March 2025 apps can't
+  read albums); the app keeps copies of picked photos, and new album photos don't appear by themselves. Needs the
+  owner's Google Cloud project + Android OAuth client, and Google Play services (so not on Fire tablets). Until
+  Google verifies the app, only test users can sign in.
+- **Alarms (planned):** settable in owner and guest modes; a real Android alarm (rings with the screen off or the
+  app closed) with a full-screen Snooze/Dismiss. Per display, the owner picks any of: sound on the tablet, turn on
+  chosen lights, play a chosen sound (from the media browser) on a chosen speaker. Settings (behind the PIN) has
+  "Clear all alarms" for between guests.
+
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
 `CLAUDE.local.md`, which is not committed. Keep personal details out of committed files and commit messages.
 

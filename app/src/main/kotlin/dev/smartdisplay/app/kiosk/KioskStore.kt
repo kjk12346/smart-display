@@ -19,6 +19,7 @@ data class KioskConfig(
     val hasPin: Boolean = false,
     val mode: DisplayMode = DisplayMode.Owner,
     val guest: GuestConfig = GuestConfig(),
+    val wallpaper: WallpaperConfig = WallpaperConfig(),
 ) {
     val isGuest: Boolean get() = mode == DisplayMode.Guest
 
@@ -50,6 +51,12 @@ class KioskStore(context: Context) {
         putString(KEY_GUEST_AREA, guest.areaId)
         putStringSet(KEY_GUEST_HIDDEN, guest.hidden)
         putStringSet(KEY_GUEST_EXTRAS, guest.extras)
+    }
+
+    fun setWallpaper(wallpaper: WallpaperConfig) = update {
+        putString(KEY_WALLPAPER_FOLDER, wallpaper.folderId)
+        putString(KEY_WALLPAPER_TITLE, wallpaper.folderTitle)
+        putInt(KEY_WALLPAPER_INTERVAL, wallpaper.intervalMinutes)
     }
 
     fun setPin(pin: String) {
@@ -99,6 +106,11 @@ class KioskStore(context: Context) {
             hidden = prefs.getStringSet(KEY_GUEST_HIDDEN, null)?.toSet().orEmpty(),
             extras = prefs.getStringSet(KEY_GUEST_EXTRAS, null)?.toSet().orEmpty(),
         ),
+        wallpaper = WallpaperConfig(
+            folderId = prefs.getString(KEY_WALLPAPER_FOLDER, null),
+            folderTitle = prefs.getString(KEY_WALLPAPER_TITLE, null),
+            intervalMinutes = prefs.getInt(KEY_WALLPAPER_INTERVAL, 5),
+        ),
     )
 
     private companion object {
@@ -112,5 +124,8 @@ class KioskStore(context: Context) {
         const val KEY_GUEST_AREA = "guest_area"
         const val KEY_GUEST_HIDDEN = "guest_hidden"
         const val KEY_GUEST_EXTRAS = "guest_extras"
+        const val KEY_WALLPAPER_FOLDER = "wallpaper_folder"
+        const val KEY_WALLPAPER_TITLE = "wallpaper_title"
+        const val KEY_WALLPAPER_INTERVAL = "wallpaper_interval"
     }
 }

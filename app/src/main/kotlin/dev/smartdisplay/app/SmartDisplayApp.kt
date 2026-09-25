@@ -1,6 +1,10 @@
 package dev.smartdisplay.app
 
 import android.app.Application
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dev.smartdisplay.app.auth.AuthStore
 import dev.smartdisplay.app.auth.HomeAssistantAuth
 import dev.smartdisplay.app.auth.Session
@@ -14,7 +18,7 @@ import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
 
 /** Holds the app-wide singletons. */
-class SmartDisplayApp : Application() {
+class SmartDisplayApp : Application(), SingletonImageLoader.Factory {
     /** For work that must outlive any one screen, such as finishing a sign-in. */
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -34,4 +38,10 @@ class SmartDisplayApp : Application() {
 
     /** The live connection; it connects only while a screen is collecting its state. */
     val home by lazy { HomeAssistantClient(http, session, { serverStore.server.value?.url }, appScope) }
+
+    /** Coil, for wallpaper photos, over the same HTTP client. */
+    override fun newImageLoader(context: PlatformContext): ImageLoader =
+        ImageLoader.Builder(context)
+            .components { add(OkHttpNetworkFetcherFactory(callFactory = { http })) }
+            .build()
 }

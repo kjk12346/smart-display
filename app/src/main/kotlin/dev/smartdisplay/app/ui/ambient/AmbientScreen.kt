@@ -2,6 +2,7 @@ package dev.smartdisplay.app.ui.ambient
 
 import android.text.format.DateFormat
 import androidx.annotation.StringRes
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -22,8 +23,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -40,10 +44,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import dev.smartdisplay.app.R
 import dev.smartdisplay.app.ha.ConnectionStatus
 import dev.smartdisplay.app.ha.DisconnectReason
 import dev.smartdisplay.app.ha.HomeState
+import dev.smartdisplay.app.kiosk.WallpaperConfig
 import dev.smartdisplay.app.ui.common.ScreenBrightness
 import dev.smartdisplay.app.ui.common.rememberMinuteClock
 import dev.smartdisplay.app.ui.theme.SmartDisplayTheme
@@ -64,6 +70,7 @@ private const val NIGHT_CONTENT_ALPHA = 0.55f
 @Composable
 fun AmbientScreen(
     home: HomeState,
+    wallpaperConfig: WallpaperConfig,
     onOpenControls: () -> Unit,
     onOpenSettings: () -> Unit,
     viewModel: AmbientViewModel = viewModel(),
@@ -85,8 +92,18 @@ fun AmbientScreen(
     val quiet = isQuietHours(now.toLocalTime())
     ScreenBrightness(if (quiet) NIGHT_BRIGHTNESS else null)
 
+    // Photos behind the clock, except at night: a dark room should stay dark.
+    LaunchedEffect(connected, wallpaperConfig, quiet) {
+        if (connected && !quiet) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepWallpaperFresh(wallpaperConfig) }
+        }
+    }
+    val wallpaper by viewModel.wallpaper.collectAsStateWithLifecycle()
+    val wallpaperUrl = wallpaper?.takeIf { !quiet && it.folderId == wallpaperConfig.folderId }?.url
+
     AmbientContent(
         now = now,
+        wallpaperUrl = wallpaperUrl,
         weather = weather,
         forecast = forecast?.takeIf { it.first == weather?.entityId }?.second,
         night = home.sunIsDown() ?: quiet,
@@ -101,6 +118,7 @@ fun AmbientScreen(
 @Composable
 private fun AmbientContent(
     now: LocalDateTime,
+    wallpaperUrl: String?,
     weather: CurrentWeather?,
     forecast: DailyForecast?,
     night: Boolean,
@@ -124,6 +142,7 @@ private fun AmbientContent(
                 detectTapGestures(onTap = { onTap() }, onLongPress = { onLongPress() })
             },
     ) {
+        if (wallpaperUrl != null) WallpaperBackground(wallpaperUrl)
         val landscape = maxWidth > maxHeight
         // The clock's digit height drives everything else's size.
         val clock = if (landscape) minOf(maxHeight * 0.30f, maxWidth * 0.15f) else minOf(maxWidth * 0.26f, maxHeight * 0.15f)
@@ -174,6 +193,27 @@ private fun AmbientContent(
 }
 
 private const val DRIFT_MS = 4_000
+
+/** A photo filling the screen, faded in over the last one, under a gradient that keeps the clock readable. */
+@Composable
+private fun WallpaperBackground(url: String) {
+    val context = LocalContext.current
+    Crossfade(targetState = url, animationSpec = tween(1_500), label = "wallpaper") { shown ->
+        AsyncImage(
+            model = wallpaperRequest(context, shown),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(SCRIM.copy(alpha = 0.35f), SCRIM.copy(alpha = 0.65f)))),
+    )
+}
+
+private val SCRIM = Color.Black
 
 @Composable
 private fun Clock(now: LocalDateTime, size: Dp, alignment: Alignment.Horizontal) {
@@ -299,6 +339,7 @@ private fun AmbientLandscapePreview() {
     SmartDisplayTheme {
         AmbientContent(
             now = LocalDateTime.of(2026, 9, 23, 18, 42),
+            wallpaperUrl = null,
             weather = CurrentWeather("weather.home", "partlycloudy", 71.6, "°F"),
             forecast = DailyForecast(78.0, 61.0),
             night = false,
@@ -317,6 +358,7 @@ private fun AmbientPortraitPreview() {
     SmartDisplayTheme {
         AmbientContent(
             now = LocalDateTime.of(2026, 9, 23, 23, 5),
+            wallpaperUrl = null,
             weather = CurrentWeather("weather.home", "rainy", 12.0, "°C"),
             forecast = DailyForecast(15.0, 9.0),
             night = true,

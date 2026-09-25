@@ -125,6 +125,19 @@ class HomeAssistantClient(
         },
     )
 
+    /** Lists a folder in Home Assistant's media browser; the empty ID is the top level. */
+    suspend fun browseMedia(contentId: String = ""): MediaFolder =
+        parseMediaFolder(command("media_source/browse_media", buildJsonObject { put("media_content_id", contentId) }))
+
+    /** A URL to download or play a media file. Local media comes back signed, so it needs no sign-in header. */
+    suspend fun resolveMedia(contentId: String): ResolvedMedia {
+        val server = serverUrl() ?: throw NotConnectedException()
+        return parseResolvedMedia(
+            command("media_source/resolve_media", buildJsonObject { put("media_content_id", contentId) }),
+            server,
+        )
+    }
+
     private suspend fun runUntilSignedOut() {
         var attempt = 0
         var retriedAuth = false

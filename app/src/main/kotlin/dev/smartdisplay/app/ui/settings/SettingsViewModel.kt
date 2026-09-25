@@ -3,6 +3,8 @@ package dev.smartdisplay.app.ui.settings
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import dev.smartdisplay.app.SmartDisplayApp
+import dev.smartdisplay.app.ha.MediaFolder
+import dev.smartdisplay.app.ha.MediaItem
 import dev.smartdisplay.app.kiosk.DisplayMode
 import dev.smartdisplay.app.kiosk.HomeApp
 import dev.smartdisplay.app.kiosk.KioskConfig
@@ -23,6 +25,7 @@ enum class KioskProblem {
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val kiosk = (application as SmartDisplayApp).kiosk
+    private val home = (application as SmartDisplayApp).home
 
     val config: StateFlow<KioskConfig> = kiosk.config
 
@@ -47,6 +50,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         if (on && !config.value.hasPin) return KioskProblem.NeedsPin
         kiosk.setPinApp(on)
         return null
+    }
+
+    /** Lists a folder in Home Assistant's media browser, for picking a wallpaper folder or an alarm sound. */
+    suspend fun browseMedia(contentId: String): MediaFolder = home.browseMedia(contentId)
+
+    fun setWallpaperFolder(folder: MediaItem?) {
+        kiosk.setWallpaper(config.value.wallpaper.copy(folderId = folder?.contentId, folderTitle = folder?.title))
+    }
+
+    fun setWallpaperInterval(minutes: Int) {
+        kiosk.setWallpaper(config.value.wallpaper.copy(intervalMinutes = minutes))
     }
 
     /** Guest mode needs the exit PIN, so switching back to the owner's view is always behind it. */

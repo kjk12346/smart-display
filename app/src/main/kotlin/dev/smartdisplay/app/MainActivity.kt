@@ -174,6 +174,7 @@ private fun AppContent(app: SmartDisplayApp) {
             when (screen) {
                 Screen.Ambient -> AmbientScreen(
                     home = home,
+                    wallpaperConfig = kiosk.wallpaper,
                     onOpenControls = { screen = Screen.Controls },
                     onOpenSettings = openSettings,
                 )

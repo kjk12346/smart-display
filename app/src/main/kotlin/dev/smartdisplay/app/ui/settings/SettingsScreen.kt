@@ -34,6 +34,7 @@ import dev.smartdisplay.app.ha.ConnectionStatus
 import dev.smartdisplay.app.ha.DisconnectReason
 import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.kiosk.DIM_AFTER_CHOICES
+import dev.smartdisplay.app.kiosk.WALLPAPER_INTERVAL_CHOICES
 import dev.smartdisplay.app.server.SavedServer
 import dev.smartdisplay.app.ui.common.Panel
 import dev.smartdisplay.app.ui.common.PanelBody
@@ -58,6 +59,7 @@ fun SettingsScreen(
     var problem by remember { mutableStateOf<KioskProblem?>(null) }
     var modeProblem by remember { mutableStateOf<KioskProblem?>(null) }
     var settingPin by remember { mutableStateOf(false) }
+    var choosingWallpaper by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Panel(eyebrow = stringResource(R.string.settings_eyebrow), title = server.displayName()) {
@@ -122,6 +124,51 @@ fun SettingsScreen(
             }
         }
 
+        Text(
+            text = stringResource(R.string.wallpaper_title),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 24.dp),
+        )
+        val wallpaper = kiosk.wallpaper
+        PanelBody(
+            if (wallpaper.folderId == null) {
+                stringResource(R.string.wallpaper_none)
+            } else {
+                stringResource(R.string.wallpaper_folder, wallpaper.folderTitle.orEmpty())
+            },
+            topPadding = 2.dp,
+        )
+        Row(modifier = Modifier.padding(top = 8.dp)) {
+            OutlinedButton(onClick = { choosingWallpaper = true }) {
+                Text(stringResource(R.string.wallpaper_choose))
+            }
+            if (wallpaper.folderId != null) {
+                TextButton(
+                    onClick = { viewModel.setWallpaperFolder(null) },
+                    modifier = Modifier.padding(start = 8.dp),
+                ) {
+                    Text(stringResource(R.string.wallpaper_remove))
+                }
+            }
+        }
+        if (wallpaper.folderId != null) {
+            PanelBody(stringResource(R.string.wallpaper_interval), topPadding = 12.dp)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .horizontalScroll(rememberScrollState()),
+            ) {
+                WALLPAPER_INTERVAL_CHOICES.forEach { minutes ->
+                    FilterChip(
+                        selected = wallpaper.intervalMinutes == minutes,
+                        onClick = { viewModel.setWallpaperInterval(minutes) },
+                        label = { Text(stringResource(R.string.settings_dim_minutes, minutes)) },
+                    )
+                }
+            }
+        }
+
         Section(stringResource(R.string.settings_kiosk))
         Text(stringResource(R.string.settings_exit_pin), style = MaterialTheme.typography.titleMedium)
         PanelBody(
@@ -163,6 +210,18 @@ fun SettingsScreen(
                 Text(stringResource(R.string.sign_out))
             }
         }
+    }
+
+    if (choosingWallpaper) {
+        MediaBrowserDialog(
+            pick = MediaPick.PhotoFolder,
+            browse = viewModel::browseMedia,
+            onPicked = {
+                viewModel.setWallpaperFolder(it)
+                choosingWallpaper = false
+            },
+            onDismiss = { choosingWallpaper = false },
+        )
     }
 
     if (settingPin) {
