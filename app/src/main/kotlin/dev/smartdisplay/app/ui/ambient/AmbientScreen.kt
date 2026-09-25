@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -46,6 +47,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import dev.smartdisplay.app.R
+import dev.smartdisplay.app.SmartDisplayApp
+import dev.smartdisplay.app.alarm.nextRing
+import dev.smartdisplay.app.alarm.nextRingText
 import dev.smartdisplay.app.ha.ConnectionStatus
 import dev.smartdisplay.app.ha.DisconnectReason
 import dev.smartdisplay.app.ha.HomeState
@@ -54,6 +58,7 @@ import dev.smartdisplay.app.ui.common.ScreenBrightness
 import dev.smartdisplay.app.ui.common.rememberMinuteClock
 import dev.smartdisplay.app.ui.theme.SmartDisplayTheme
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -101,9 +106,18 @@ fun AmbientScreen(
     val wallpaper by viewModel.wallpaper.collectAsStateWithLifecycle()
     val wallpaperUrl = wallpaper?.takeIf { !quiet && it.folderId == wallpaperConfig.folderId }?.url
 
+    val alarms = (LocalContext.current.applicationContext as SmartDisplayApp).alarms
+    val alarmList by alarms.alarms.collectAsStateWithLifecycle()
+    val snooze by alarms.snooze.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val nextAlarm = remember(alarmList, snooze, now) {
+        nextRing(alarmList, snooze, now.atZone(ZoneId.systemDefault()))?.let { nextRingText(context, it) }
+    }
+
     AmbientContent(
         now = now,
         wallpaperUrl = wallpaperUrl,
+        nextAlarm = nextAlarm,
         weather = weather,
         forecast = forecast?.takeIf { it.first == weather?.entityId }?.second,
         night = home.sunIsDown() ?: quiet,
@@ -119,6 +133,7 @@ fun AmbientScreen(
 private fun AmbientContent(
     now: LocalDateTime,
     wallpaperUrl: String?,
+    nextAlarm: String?,
     weather: CurrentWeather?,
     forecast: DailyForecast?,
     night: Boolean,
@@ -158,7 +173,7 @@ private fun AmbientContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(clock * 0.6f),
                 ) {
-                    Clock(now, clock, Alignment.Start)
+                    Clock(now, nextAlarm, clock, Alignment.Start)
                     if (weather != null) Weather(weather, forecast, night, clock)
                 }
             } else {
@@ -166,7 +181,7 @@ private fun AmbientContent(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(clock * 0.45f),
                 ) {
-                    Clock(now, clock, Alignment.CenterHorizontally)
+                    Clock(now, nextAlarm, clock, Alignment.CenterHorizontally)
                     if (weather != null) Weather(weather, forecast, night, clock)
                 }
             }
@@ -216,7 +231,7 @@ private fun WallpaperBackground(url: String) {
 private val SCRIM = Color.Black
 
 @Composable
-private fun Clock(now: LocalDateTime, size: Dp, alignment: Alignment.Horizontal) {
+private fun Clock(now: LocalDateTime, nextAlarm: String?, size: Dp, alignment: Alignment.Horizontal) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val use24Hour = DateFormat.is24HourFormat(context)
@@ -254,6 +269,14 @@ private fun Clock(now: LocalDateTime, size: Dp, alignment: Alignment.Horizontal)
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = size * 0.08f),
         )
+        if (nextAlarm != null) {
+            Text(
+                text = stringResource(R.string.alarms_next, nextAlarm),
+                fontSize = (size * 0.12f).asTextSize(),
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.padding(top = size * 0.04f),
+            )
+        }
     }
 }
 
@@ -340,6 +363,7 @@ private fun AmbientLandscapePreview() {
         AmbientContent(
             now = LocalDateTime.of(2026, 9, 23, 18, 42),
             wallpaperUrl = null,
+            nextAlarm = null,
             weather = CurrentWeather("weather.home", "partlycloudy", 71.6, "°F"),
             forecast = DailyForecast(78.0, 61.0),
             night = false,
@@ -359,6 +383,7 @@ private fun AmbientPortraitPreview() {
         AmbientContent(
             now = LocalDateTime.of(2026, 9, 23, 23, 5),
             wallpaperUrl = null,
+            nextAlarm = null,
             weather = CurrentWeather("weather.home", "rainy", 12.0, "°C"),
             forecast = DailyForecast(15.0, 9.0),
             night = true,

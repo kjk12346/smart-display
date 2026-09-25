@@ -5,6 +5,7 @@ import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import dev.smartdisplay.app.alarm.Alarms
 import dev.smartdisplay.app.auth.AuthStore
 import dev.smartdisplay.app.auth.HomeAssistantAuth
 import dev.smartdisplay.app.auth.Session
@@ -25,6 +26,8 @@ class SmartDisplayApp : Application(), SingletonImageLoader.Factory {
     val serverStore by lazy { ServerStore(this) }
 
     val kiosk by lazy { KioskStore(this) }
+
+    val alarms by lazy { Alarms(this) }
 
     val http: OkHttpClient by lazy {
         OkHttpClient.Builder()

@@ -5,6 +5,19 @@
     <!-- Only enforced for apps targeting API 37+; raising targetSdk to 37 also needs a runtime request. -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
+    <!-- Alarms: exact alarm-clock scheduling (USE_EXACT_ALARM from API 33, SCHEDULE_EXACT_ALARM before), the ringing
+         service and its full-screen notification, and rescheduling after a reboot. -->
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
         android:name=".SmartDisplayApp"
         android:allowBackup="false"
@@ -34,6 +47,31 @@
                     android:scheme="smartdisplay" />
             </intent-filter>
         </activity>
+
+        <!-- A ringing alarm, over the lock screen. Same task as the display, so it also works while pinned. -->
+        <activity
+            android:name=".alarm.AlarmActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:showOnLockScreen="true" />
+
+        <!-- Rings alarms; "systemExempted" is the foreground service type for alarm apps (API 34+). -->
+        <service
+            android:name=".alarm.AlarmService"
+            android:exported="false"
+            android:foregroundServiceType="systemExempted" />
+
+        <receiver
+            android:name=".alarm.AlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <!-- "Use as Home app" in Settings turns this on (kiosk/HomeApp.kt), so the display can open on startup. -->
         <activity-alias

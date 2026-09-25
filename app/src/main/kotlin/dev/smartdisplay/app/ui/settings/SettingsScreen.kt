@@ -169,6 +169,9 @@ fun SettingsScreen(
             }
         }
 
+        Section(stringResource(R.string.settings_alarms))
+        AlarmSettings(home = home, browse = viewModel::browseMedia)
+
         Section(stringResource(R.string.settings_kiosk))
         Text(stringResource(R.string.settings_exit_pin), style = MaterialTheme.typography.titleMedium)
         PanelBody(
@@ -284,7 +287,7 @@ private fun Section(title: String) {
 }
 
 @Composable
-private fun SwitchRow(title: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier

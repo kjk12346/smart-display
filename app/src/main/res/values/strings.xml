@@ -133,6 +133,43 @@
     <string name="hvac_dry">Dry</string>
     <string name="hvac_fan_only">Fan</string>
 
+    <string name="alarms_eyebrow">Clock</string>
+    <string name="alarms_title">Alarms</string>
+    <string name="alarms_none">No alarms yet.</string>
+    <string name="alarms_add">Add alarm</string>
+    <string name="alarms_edit">Edit alarm</string>
+    <string name="alarms_delete">Delete</string>
+    <string name="alarms_repeat">Repeat</string>
+    <string name="alarms_label">Label (optional)</string>
+    <string name="alarms_once">Once</string>
+    <string name="alarms_every_day">Every day</string>
+    <string name="alarms_weekdays">Weekdays</string>
+    <string name="alarms_weekends">Weekends</string>
+    <string name="alarms_allow">Allow</string>
+    <string name="alarms_need_notifications">Alarms can\'t ring until this app may show notifications.</string>
+    <string name="alarms_need_full_screen">Allow full-screen alarms, so a ringing alarm shows over the lock screen.</string>
+    <string name="alarms_next">Alarm %1$s</string>
+    <string name="alarms_button">Alarms</string>
+    <string name="settings_alarms">When an alarm rings</string>
+    <string name="alarm_sound">Ring on this display</string>
+    <string name="alarm_sound_body">Uses the tablet\'s alarm sound and alarm volume.</string>
+    <string name="alarm_lights">Turn on lights</string>
+    <string name="alarm_lights_none">None chosen.</string>
+    <string name="alarm_lights_choose">Choose lights</string>
+    <string name="alarm_speaker">Play on a speaker</string>
+    <string name="alarm_speaker_none">Off.</string>
+    <string name="alarm_speaker_set">“%1$s” on %2$s.</string>
+    <string name="alarm_speaker_choose">Choose speaker</string>
+    <string name="alarm_sound_choose">Choose sound</string>
+    <string name="alarm_speaker_off">Turn off</string>
+    <string name="alarm_clear_all">Clear all alarms</string>
+    <string name="alarm_clear_all_body">For between guests: removes every alarm on this display.</string>
+    <string name="alarm_channel">Alarms</string>
+    <string name="alarm_default_label">Alarm</string>
+    <string name="alarm_snooze">Snooze</string>
+    <string name="alarm_snooze_minutes">Snooze %1$d min</string>
+    <string name="alarm_dismiss">Dismiss</string>
+
     <!-- Home Assistant weather conditions. -->
     <string name="weather_clear">Clear</string>
     <string name="weather_sunny">Sunny</string>
@@ -168,5 +205,9 @@
     <plurals name="media_photo_count">
         <item quantity="one">%1$d photo in this folder</item>
         <item quantity="other">%1$d photos in this folder</item>
+    </plurals>
+    <plurals name="alarm_lights_count">
+        <item quantity="one">%1$d light: %2$s</item>
+        <item quantity="other">%1$d lights: %2$s</item>
     </plurals>
 </resources>

@@ -24,6 +24,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dev.smartdisplay.app.auth.REDIRECT_URI
 import dev.smartdisplay.app.auth.SessionState
+import dev.smartdisplay.app.ui.alarms.AlarmsScreen
 import dev.smartdisplay.app.ui.ambient.AmbientScreen
 import dev.smartdisplay.app.ui.common.HideSystemBars
 import dev.smartdisplay.app.ui.common.KeepScreenOn
@@ -183,7 +184,9 @@ private fun AppContent(app: SmartDisplayApp) {
                     guest = kiosk.guest.takeIf { kiosk.isGuest },
                     onDone = { screen = Screen.Ambient },
                     onOpenSettings = openSettings,
+                    onOpenAlarms = { screen = Screen.Alarms },
                 )
+                Screen.Alarms -> AlarmsScreen(onDone = { screen = Screen.Controls })
                 Screen.Settings -> SettingsScreen(
                     server = current,
                     home = home,
@@ -215,4 +218,4 @@ private fun AppContent(app: SmartDisplayApp) {
 }
 
 /** The screens once signed in. */
-private enum class Screen { Ambient, Controls, Settings }
+private enum class Screen { Ambient, Controls, Alarms, Settings }

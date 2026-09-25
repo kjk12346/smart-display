@@ -76,6 +76,7 @@ fun ControlsScreen(
     guest: GuestConfig?,
     onDone: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAlarms: () -> Unit,
     viewModel: ControlsViewModel = viewModel(),
 ) {
     BackHandler(onBack = onDone)
@@ -104,7 +105,8 @@ fun ControlsScreen(
                 if (guest != null) {
                     val guestRooms = remember(rooms, guest) { rooms.forGuest(guest) }
                     Column {
-                        Header(guestRooms.firstOrNull { it.id == guest.areaId }?.name, home, onDone, onOpenSettings)
+                        val title = guestRooms.firstOrNull { it.id == guest.areaId }?.name
+                        Header(title, home, onDone, onOpenSettings, onOpenAlarms)
                         GuestGrid(home, guestRooms, ownAreaId = guest.areaId, onCall = call)
                     }
                 } else if (maxWidth >= SIDE_LIST_MIN_WIDTH) {
@@ -119,13 +121,14 @@ fun ControlsScreen(
                                 .background(MaterialTheme.colorScheme.surfaceContainerLow),
                         )
                         Column(Modifier.weight(1f)) {
-                            Header(if (selected != null) roomName else null, home, onDone, onOpenSettings)
+                            val title = if (selected != null) roomName else null
+                            Header(title, home, onDone, onOpenSettings, onOpenAlarms)
                             RoomGrid(home, selected, call)
                         }
                     }
                 } else {
                     Column {
-                        Header(null, home, onDone, onOpenSettings)
+                        Header(null, home, onDone, onOpenSettings, onOpenAlarms)
                         RoomChips(rooms, selected, onSelect = { selectedKey = it.key })
                         RoomGrid(home, selected, call)
                     }
@@ -137,7 +140,13 @@ fun ControlsScreen(
 }
 
 @Composable
-private fun Header(title: String?, home: HomeState, onDone: () -> Unit, onOpenSettings: () -> Unit) {
+private fun Header(
+    title: String?,
+    home: HomeState,
+    onDone: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenAlarms: () -> Unit,
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -154,6 +163,7 @@ private fun Header(title: String?, home: HomeState, onDone: () -> Unit, onOpenSe
                 )
             }
         }
+        TextButton(onClick = onOpenAlarms) { Text(stringResource(R.string.alarms_button)) }
         TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_eyebrow)) }
         FilledTonalButton(onClick = onDone, modifier = Modifier.padding(start = 8.dp)) {
             Text(stringResource(R.string.settings_done))

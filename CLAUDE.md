@@ -33,10 +33,18 @@ Home Assistant.
   read albums); the app keeps copies of picked photos, and new album photos don't appear by themselves. Needs the
   owner's Google Cloud project + Android OAuth client, and Google Play services (so not on Fire tablets). Until
   Google verifies the app, only test users can sign in.
-- **Alarms (planned):** settable in owner and guest modes; a real Android alarm (rings with the screen off or the
+- **Alarms (built):** settable in owner and guest modes; a real Android alarm (rings with the screen off or the
   app closed) with a full-screen Snooze/Dismiss. Per display, the owner picks any of: sound on the tablet, turn on
   chosen lights, play a chosen sound (from the media browser) on a chosen speaker. Settings (behind the PIN) has
   "Clear all alarms" for between guests.
+  - Code in `alarm/`. Only the next ring is scheduled (`AlarmManager.setAlarmClock`); each ring schedules the next.
+    `AlarmReceiver` reschedules after boot, clock/time zone changes and app updates. `AlarmService` is a foreground
+    service of type `systemExempted` (allowed for apps holding USE_EXACT_ALARM); it plays the sound, runs the Home
+    Assistant actions over the live connection, and starts `AlarmActivity` (over the lock screen, same task, so it
+    works while pinned). Rings stop after 10 minutes; snooze is 10 minutes.
+  - Checked on a Pixel 6 (Android 17 beta): rings on time with the app showing, and with the app in the background
+    and the screen off (wakes it); Snooze reschedules, Dismiss stops everything; a pending snooze survived an app
+    update. Not yet checked: the lights and speaker actions, and old/Fire tablets.
 
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
 `CLAUDE.local.md`, which is not committed. Keep personal details out of committed files and commit messages.
