@@ -129,8 +129,9 @@ Home Assistant.
      Home copy closes any other, an ordinary launch while this is Home goes to Home, and turning Home off reopens an
      ordinary copy from the Home copy's `onDestroy` (Android applies the alias change about a second later, so the
      launcher flashes briefly). Fire tablets have no Home app chooser (`ACTION_HOME_SETTINGS`), so that needs the
-     later device-owner or adb route. Idle dim is in `MainActivity.dispatchTouchEvent` (the waking touch is swallowed there, before any
-     screen sees it). All brightness requests go through `WindowBrightness`; the darkest wins.
+     later device-owner or adb route. Idle dim is in `MainActivity.dispatchTouchEvent` (the waking touch is
+     swallowed there, before any screen sees it). All brightness requests go through `WindowBrightness`; the darkest
+     wins.
 
 ## Later (v0.2 and on; don't build in v0.1)
 
