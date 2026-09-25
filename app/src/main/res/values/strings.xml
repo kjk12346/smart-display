@@ -15,7 +15,7 @@
     <string name="setup_connect">Connect</string>
 
     <string name="local_network_title">Allow network access</string>
-    <string name="local_network_body">This display talks to Home Assistant directly over your home network. Android needs your permission for that.</string>
+    <string name="local_network_body">This display talks to Home Assistant directly over your home network. Android calls this access to “nearby devices” and asks for your permission.</string>
     <string name="local_network_denied">Android won\'t ask again. Allow access to devices on your local network in this app\'s permissions.</string>
     <string name="local_network_allow">Allow</string>
     <string name="local_network_settings">Open settings</string>
