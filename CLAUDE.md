@@ -131,7 +131,11 @@ Home Assistant.
      launcher flashes briefly). Fire tablets have no Home app chooser (`ACTION_HOME_SETTINGS`), so that needs the
      later device-owner or adb route. Idle dim is in `MainActivity.dispatchTouchEvent` (the waking touch is
      swallowed there, before any screen sees it). All brightness requests go through `WindowBrightness`; the darkest
-     wins.
+     wins. Power button in a kiosk (Home app, pinned or guest, with "Keep screen on"): apps can't catch the key, so
+     `MainActivity.onScreenOff` (a screen-off broadcast while the display was showing) goes back to the clock and
+     wakes the screen with a brief `ACQUIRE_CAUSES_WAKEUP` wake lock; the display shows over the lock screen. Holding
+     power still gives Android's power menu. While pinned, Android shows its "To unpin" reminder on each wake; only
+     the later device-owner kiosk avoids that.
 
 ## Later (v0.2 and on; don't build in v0.1)
 

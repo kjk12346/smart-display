@@ -1,22 +1,30 @@
 package dev.smartdisplay.app
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.view.MotionEvent
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,6 +49,8 @@ import dev.smartdisplay.app.ui.settings.checkExitPin
 import dev.smartdisplay.app.ui.setup.SetupScreen
 import dev.smartdisplay.app.ui.signin.SignInScreen
 import dev.smartdisplay.app.ui.theme.SmartDisplayTheme
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -58,6 +68,14 @@ class MainActivity : ComponentActivity() {
     private var dimmed = false
     private var swallowingTouch = false
     private val dimRunnable = Runnable { setDimmed(true) }
+
+    // The power button in a kiosk: see onScreenOff.
+    private val screenOffs = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private var sleptWhileShowing = false
+    private var watchingScreen = false
+    private val screenOffReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = onScreenOff()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,6 +96,15 @@ class MainActivity : ComponentActivity() {
         }
         running += this
 
+        // A kiosk shows over the lock screen, so waking it (below) brings back the display, not the lock screen.
+        lifecycleScope.launch {
+            app.kiosk.config.map { it.locked }.distinctUntilChanged().collect(::showOverLockScreen)
+        }
+        ContextCompat.registerReceiver(
+            this, screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        watchingScreen = true
+
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 app.kiosk.config.map { it.dimAfterMinutes }.distinctUntilChanged().collect { minutes ->
@@ -91,7 +118,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             SmartDisplayTheme {
                 CompositionLocalProvider(LocalWindowBrightness provides brightness) {
-                    AppContent(app)
+                    AppContent(app, screenOffs)
                 }
             }
         }
@@ -103,8 +130,21 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
+    override fun onStart() {
+        super.onStart()
+        sleptWhileShowing = false
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Stopped because the screen is going off (the power button or a timeout), not because something opened
+        // on top. The screen-off broadcast arrives just after this.
+        sleptWhileShowing = !getSystemService(PowerManager::class.java).isInteractive
+    }
+
     override fun onDestroy() {
         running -= this
+        if (watchingScreen) unregisterReceiver(screenOffReceiver)
         // The owner turned "Use as Home app" off: Android closes the Home display (a second or so later, once the
         // alias is off), so open an ordinary one in its place rather than dropping to the launcher. Not when someone
         // simply chose another Home app in Android's settings: then the display's own setting is still on.
@@ -156,6 +196,36 @@ class MainActivity : ComponentActivity() {
         brightness.request(IDLE_DIM, if (on) IDLE_BRIGHTNESS else null)
     }
 
+    /**
+     * The power button, in a kiosk: apps can't catch the button itself, so when the screen goes off while the display
+     * was showing, it goes back to the clock and wakes the screen straight away. Only with "Keep screen on", or the
+     * screen's own sleep timeout would be undone too. Holding the button still offers Android's power menu.
+     */
+    private fun onScreenOff() {
+        val config = app.kiosk.config.value
+        val showing = sleptWhileShowing || lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+        if (!config.locked || !config.keepScreenOn || !showing) return
+        screenOffs.tryEmit(Unit)
+        // Deprecated in favour of setTurnScreenOn, which only acts when an activity is resumed; the display is
+        // already open, so a brief wake lock that wakes the device is what's needed here.
+        @Suppress("DEPRECATION")
+        val flags = PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP
+        getSystemService(PowerManager::class.java).newWakeLock(flags, WAKE_TAG).acquire(WAKE_MS)
+    }
+
+    private fun showOverLockScreen(on: Boolean) {
+        if (Build.VERSION.SDK_INT >= 27) {
+            setShowWhenLocked(on)
+        } else {
+            @Suppress("DEPRECATION")
+            if (on) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
+            } else {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
+            }
+        }
+    }
+
     private fun handleIntent(intent: Intent?) {
         val uri = intent?.data ?: return
         val redirect = REDIRECT_URI.toUri()
@@ -165,13 +235,18 @@ class MainActivity : ComponentActivity() {
     private companion object {
         val IDLE_DIM = Any()
 
+        const val WAKE_TAG = "smartdisplay:power-button"
+
+        /** How long the wake lock holds; after that the window's keep-screen-on keeps it awake. */
+        const val WAKE_MS = 5_000L
+
         /** The displays open now (main thread only): normally one, briefly two while becoming the Home app. */
         val running = mutableSetOf<MainActivity>()
     }
 }
 
 @Composable
-private fun AppContent(app: SmartDisplayApp) {
+private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
     val localNetwork = rememberLocalNetworkAccess()
     if (!localNetwork.granted) {
         LocalNetworkPrompt(localNetwork)
@@ -192,6 +267,13 @@ private fun AppContent(app: SmartDisplayApp) {
             val home by app.home.state.collectAsStateWithLifecycle()
             var screen by rememberSaveable { mutableStateOf(Screen.Ambient) }
             var askingPin by rememberSaveable { mutableStateOf(false) }
+            // The power button in a kiosk wakes the display straight back to the clock (MainActivity.onScreenOff).
+            LaunchedEffect(screenOffs) {
+                screenOffs.collect {
+                    screen = Screen.Ambient
+                    askingPin = false
+                }
+            }
             val openSettings = { if (kiosk.hasPin) askingPin = true else screen = Screen.Settings }
 
             // Full screen for the whole display, not per screen: switching screens would briefly show the bars.
