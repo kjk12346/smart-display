@@ -44,6 +44,7 @@ import dev.smartdisplay.app.ui.common.LocalNetworkPrompt
 import dev.smartdisplay.app.ui.common.LocalWindowBrightness
 import dev.smartdisplay.app.ui.common.LockTask
 import dev.smartdisplay.app.ui.common.ReturnWhenIdle
+import dev.smartdisplay.app.ui.winddown.WindDownOverlay
 import dev.smartdisplay.app.ui.common.rememberMinuteClock
 import dev.smartdisplay.app.ui.common.WindowBrightness
 import dev.smartdisplay.app.ui.common.rememberLocalNetworkAccess
@@ -346,6 +347,10 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                         scope.launch { app.session.signOut() }
                     },
                 )
+            }
+            // A wind-down under way shows over the resting screens and Controls, not over Alarms or Settings.
+            if (screen == Screen.Ambient || screen == Screen.Dashboard || screen == Screen.Controls) {
+                WindDownOverlay(home, kiosk.kitchen.hiddenCalendars)
             }
             if (askingPin) {
                 EnterPinDialog(

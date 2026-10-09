@@ -71,6 +71,7 @@ import dev.smartdisplay.app.ui.common.rememberMinuteClock
 import dev.smartdisplay.app.ui.theme.FamilyColor
 import dev.smartdisplay.app.ui.theme.OnPersonColor
 import dev.smartdisplay.app.ui.theme.color
+import dev.smartdisplay.app.ui.winddown.WindDownButton
 import java.time.LocalDate
 import java.time.format.TextStyle
 
@@ -163,6 +164,7 @@ fun DashboardScreen(
     }
     val navButtons: @Composable () -> Unit = {
         TextButton(onClick = onOpenControls) { Text(stringResource(R.string.dashboard_rooms)) }
+        WindDownButton()
         TextButton(onClick = onOpenAlarms) { Text(stringResource(R.string.alarms_button)) }
         TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_eyebrow)) }
     }
@@ -175,7 +177,8 @@ fun DashboardScreen(
                 currentWeather()
                 ForecastStrip(days, today = now.toLocalDate())
                 Spacer(Modifier.weight(1f))
-                Column(horizontalAlignment = Alignment.End) { navButtons() }
+                // Two by two, so a fourth button (Wind down) doesn't make the header taller.
+                FlowRow(maxItemsInEachRow = 2, horizontalArrangement = Arrangement.End) { navButtons() }
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

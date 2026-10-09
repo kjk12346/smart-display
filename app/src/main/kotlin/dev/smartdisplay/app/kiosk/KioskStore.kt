@@ -185,7 +185,8 @@ internal fun decodeListMap(text: String?): Map<String, List<String>> {
 }
 
 /** A map of strings, stored as a JSON object. */
-internal fun encodeMap(map: Map<String, String>): String = JsonObject(map.mapValues { JsonPrimitive(it.value) }).toString()
+internal fun encodeMap(map: Map<String, String>): String =
+    JsonObject(map.mapValues { JsonPrimitive(it.value) }).toString()
 
 internal fun decodeMap(text: String?): Map<String, String> {
     val obj = text?.let { runCatching { Json.parseToJsonElement(it) }.getOrNull() } as? JsonObject ?: return emptyMap()

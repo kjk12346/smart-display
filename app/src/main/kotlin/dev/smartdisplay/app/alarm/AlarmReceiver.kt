@@ -6,8 +6,9 @@ import android.content.Intent
 import dev.smartdisplay.app.SmartDisplayApp
 
 /**
- * Android's alarm clock calls this when an alarm is due, and when its sunrise should start; it also reschedules after
- * a reboot, a clock or time zone change, or an app update, since Android forgets scheduled alarms then.
+ * Android's alarm clock calls this when an alarm is due, when its sunrise should start, and when the evening's
+ * wind-down should; it also reschedules after a reboot, a clock or time zone change, or an app update, since Android
+ * forgets scheduled alarms then.
  */
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -31,6 +32,15 @@ class AlarmReceiver : BroadcastReceiver() {
                     AlarmService.sunrise(context, alarmId, ringAt)
                 }
             }
+            ACTION_WIND_DOWN -> {
+                // Only if it's still the one due (the alarm or the settings may have changed since this was set).
+                val next = alarms.nextWindDown()
+                if (next != null && next.bedtimeMillis == intent.getLongExtra(EXTRA_BEDTIME, 0)) {
+                    WindDownService.start(context, next)
+                } else {
+                    alarms.reschedule()
+                }
+            }
             else -> alarms.reschedule()
         }
     }
@@ -40,5 +50,7 @@ class AlarmReceiver : BroadcastReceiver() {
         const val ACTION_SUNRISE = "dev.smartdisplay.app.alarm.SUNRISE"
         const val EXTRA_ALARM_ID = "alarm_id"
         const val EXTRA_RING_AT = "ring_at"
+        const val ACTION_WIND_DOWN = "dev.smartdisplay.app.alarm.WIND_DOWN"
+        const val EXTRA_BEDTIME = "bedtime"
     }
 }

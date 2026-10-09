@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.core.content.edit
 import dev.smartdisplay.app.MainActivity
 import java.time.DayOfWeek
+import java.time.LocalTime
 import java.time.ZonedDateTime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -63,6 +64,14 @@ class Alarms(private val context: Context) {
     /** A ring that won't happen, because someone was up before it. */
     val skip: StateFlow<Skip?> = _skip.asStateFlow()
 
+    private val _windDown = MutableStateFlow(loadWindDown())
+
+    /** The evening wind-down's settings. */
+    val windDown: StateFlow<WindDownSettings> = _windDown.asStateFlow()
+
+    /** Nights with a bedtime up to this were already wound down, or the wind-down was stopped. */
+    private var windDownDoneUntil = prefs.getLong(KEY_WIND_DOWN_DONE, 0)
+
     fun add(hour: Int, minute: Int, days: Set<DayOfWeek>, label: String): Alarm {
         val id = prefs.getInt(KEY_NEXT_ID, 1)
         val alarm = Alarm(id, hour, minute, days, label.trim())
@@ -100,6 +109,35 @@ class Alarms(private val context: Context) {
         if (sunriseChanged) reschedule()
     }
 
+    fun setWindDown(settings: WindDownSettings) {
+        prefs.edit {
+            putBoolean(KEY_WD_ENABLED, settings.enabled)
+            putStringSet(KEY_WD_LIGHTS, settings.lights)
+            putInt(KEY_WD_MINUTES, settings.minutes)
+            putInt(KEY_WD_SLEEP, settings.sleepMinutes)
+            putInt(KEY_WD_BEDTIME, settings.fallbackBedtime?.toSecondOfDay()?.div(60) ?: -1)
+            putStringSet(KEY_WD_HOUSE_OFF, settings.houseOff)
+        }
+        _windDown.value = settings
+        reschedule()
+    }
+
+    /** The next wind-down that should start by itself (or one under way), if any. */
+    fun nextWindDown(now: ZonedDateTime = ZonedDateTime.now()): WindDown? =
+        nextWindDown(_alarms.value, _skip.value, _windDown.value, now, windDownDoneUntil)
+
+    /**
+     * A wind-down was started from its button, or stopped, or is over: tonight's doesn't start (again) by itself.
+     * Covers [bedtimeMillis], and tonight's own bedtime if that's within the next 12 hours.
+     */
+    fun windDownDone(bedtimeMillis: Long, now: ZonedDateTime = ZonedDateTime.now()) {
+        val tonight = nextWindDown(now)?.bedtimeMillis
+            ?.takeIf { it - now.toInstant().toEpochMilli() < 12 * 60 * 60_000L }
+        windDownDoneUntil = maxOf(windDownDoneUntil, bedtimeMillis, tonight ?: 0)
+        prefs.edit { putLong(KEY_WIND_DOWN_DONE, windDownDoneUntil) }
+        reschedule()
+    }
+
     /** Called when [alarm] starts ringing: a one-time alarm turns itself off, and the next ring is scheduled. */
     fun onRang(alarm: Alarm) {
         _snooze.value?.takeIf { it.alarmId == alarm.id }?.let { setSnooze(null, reschedule = false) }
@@ -133,6 +171,8 @@ class Alarms(private val context: Context) {
         val manager = context.getSystemService(AlarmManager::class.java)
         manager.cancel(fireIntent())
         manager.cancel(sunriseIntent())
+        manager.cancel(windDownIntent())
+        scheduleWindDown(manager)
         val next = next() ?: return
         val at = next.at.toInstant().toEpochMilli()
         val show = PendingIntent.getActivity(
@@ -159,6 +199,37 @@ class Alarms(private val context: Context) {
     }
 
     fun alarm(id: Int): Alarm? = _alarms.value.firstOrNull { it.id == id }
+
+    /** Starts the next wind-down at its time (straight away, if it should already be under way). */
+    private fun scheduleWindDown(manager: AlarmManager) {
+        val windDown = nextWindDown() ?: return
+        val start = maxOf(windDown.startMillis, System.currentTimeMillis())
+        try {
+            manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, start, windDownIntent(windDown))
+        } catch (e: SecurityException) {
+            manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, start, windDownIntent(windDown))
+        }
+    }
+
+    private fun windDownIntent(windDown: WindDown? = null): PendingIntent {
+        val intent = Intent(context, AlarmReceiver::class.java).setAction(AlarmReceiver.ACTION_WIND_DOWN)
+        if (windDown != null) intent.putExtra(AlarmReceiver.EXTRA_BEDTIME, windDown.bedtimeMillis)
+        return PendingIntent.getBroadcast(
+            context, 2, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+    }
+
+    private fun loadWindDown() = WindDownSettings(
+        enabled = prefs.getBoolean(KEY_WD_ENABLED, false),
+        lights = prefs.getStringSet(KEY_WD_LIGHTS, null)?.toSet().orEmpty(),
+        minutes = prefs.getInt(KEY_WD_MINUTES, DEFAULT_WIND_DOWN_MINUTES),
+        sleepMinutes = prefs.getInt(KEY_WD_SLEEP, DEFAULT_SLEEP_MINUTES),
+        fallbackBedtime = when (val minutes = prefs.getInt(KEY_WD_BEDTIME, DEFAULT_FALLBACK_BEDTIME.hour * 60)) {
+            in 0 until 24 * 60 -> LocalTime.of(minutes / 60, minutes % 60)
+            else -> null
+        },
+        houseOff = prefs.getStringSet(KEY_WD_HOUSE_OFF, null)?.toSet().orEmpty(),
+    )
 
     private fun fireIntent(next: NextRing? = null): PendingIntent {
         val intent = Intent(context, AlarmReceiver::class.java).setAction(AlarmReceiver.ACTION_FIRE)
@@ -250,6 +321,13 @@ class Alarms(private val context: Context) {
         private const val KEY_SUNRISE = "action_sunrise_minutes"
         private const val KEY_SKIP_ID = "skip_id"
         private const val KEY_SKIP_AT = "skip_at"
+        private const val KEY_WD_ENABLED = "wind_down_enabled"
+        private const val KEY_WD_LIGHTS = "wind_down_lights"
+        private const val KEY_WD_MINUTES = "wind_down_minutes"
+        private const val KEY_WD_SLEEP = "wind_down_sleep_minutes"
+        private const val KEY_WD_BEDTIME = "wind_down_bedtime_minutes"
+        private const val KEY_WD_HOUSE_OFF = "wind_down_house_off"
+        private const val KEY_WIND_DOWN_DONE = "wind_down_done_until"
 
         internal fun encode(alarms: List<Alarm>): String = buildJsonArray {
             alarms.forEach { alarm ->

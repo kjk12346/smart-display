@@ -173,6 +173,12 @@ fun SettingsScreen(
         Section(stringResource(R.string.settings_alarms))
         AlarmSettings(home = home, browse = viewModel::browseMedia)
 
+        // Not in guest rooms: a guest's lights are their own business.
+        if (!kiosk.isGuest) {
+            Section(stringResource(R.string.wind_down_title))
+            WindDownSettings(home)
+        }
+
         Section(stringResource(R.string.settings_kiosk))
         Text(stringResource(R.string.settings_exit_pin), style = MaterialTheme.typography.titleMedium)
         PanelBody(

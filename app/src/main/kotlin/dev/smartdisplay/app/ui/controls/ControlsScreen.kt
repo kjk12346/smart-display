@@ -55,6 +55,7 @@ import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.kiosk.GuestConfig
 import dev.smartdisplay.app.ui.common.ReturnWhenIdle
 import kotlinx.coroutines.delay
+import dev.smartdisplay.app.ui.winddown.WindDownButton
 
 /** After this long without a touch, the display goes back to the clock. */
 private const val IDLE_RETURN_MS = 2 * 60_000L
@@ -164,6 +165,7 @@ private fun Header(
                 )
             }
         }
+        WindDownButton()
         TextButton(onClick = onOpenAlarms) { Text(stringResource(R.string.alarms_button)) }
         TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_eyebrow)) }
         FilledTonalButton(onClick = onDone, modifier = Modifier.padding(start = 8.dp)) {

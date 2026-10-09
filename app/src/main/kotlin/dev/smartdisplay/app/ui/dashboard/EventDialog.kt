@@ -66,11 +66,18 @@ internal fun EventDialog(
             ) {
                 Text(eventWhen(event), style = MaterialTheme.typography.bodyLarge)
                 event.location?.let {
-                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 if (event.calendarIds.isNotEmpty()) {
                     Text(
-                        stringResource(R.string.event_from, event.calendarIds.joinToString(", ", transform = calendarName)),
+                        stringResource(
+                            R.string.event_from,
+                            event.calendarIds.joinToString(", ", transform = calendarName),
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -61,6 +61,12 @@
             android:exported="false"
             android:foregroundServiceType="systemExempted" />
 
+        <!-- The evening wind-down, started by the alarm clock or its button; the same type as AlarmService. -->
+        <service
+            android:name=".alarm.WindDownService"
+            android:exported="false"
+            android:foregroundServiceType="systemExempted" />
+
         <receiver
             android:name=".alarm.AlarmReceiver"
             android:exported="false">

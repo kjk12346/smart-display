@@ -58,6 +58,20 @@ Home Assistant.
   (`Skip`; a one-time alarm turns off). The ring itself is at normal volume: the owner wants the gentle part to be
   light only. An alarm set for sooner than the sunrise squeezes it into the time left. Checked on the Pixel with two
   on/off lamps (glow, ring, lamps on at the ring, "I'm up"); the fade itself waits for dimmable bulbs.
+- **Wind down (added 2026-10-09):** the evening mirror of the sunrise, in owner and kitchen modes (not guest).
+  Settings > "Winding down": lights to dim, how long (15–60 min, default 45), "Start by itself", sleep length
+  (7–9 h, default 8) and a fallback bedtime for nights without a morning alarm (3 AM–noon), plus things elsewhere
+  turned off at the start (`homeassistant.turn_off`). Bedtime is the next morning's alarm minus the sleep length
+  (`alarm/WindDown.kt`, `nextWindDown`). The chosen lights that are on fade to 2% at 2200 K (brightness falls by
+  (1−p)², never brighter or cooler than they were), then go off at bedtime; lights that were off stay off, and one
+  turned off during it stays off. Runs in its own foreground service, `WindDownService` (systemExempted, notification
+  id 2), so it and `AlarmService` never stop each other; scheduled by `Alarms.reschedule()` (request code 2). A
+  Wind down button (kitchen dashboard, Controls header) starts one now and counts as tonight's
+  (`Alarms.windDownDone`). While it runs, `WindDownOverlay` shows lights-off time, tomorrow's alarm and first event,
+  and a bedtime check (`ui/winddown/BedtimeChecks.kt`: unlocked locks, open garage covers, open door/window sensors,
+  lights and TVs on, with one-tap fixes), with Hide, Stop and Lights off now. Each display has its own settings;
+  displays don't share them (that waits for the mobile_app registration). Checked on the Pixel with a placeholder
+  light (button, panel, checks, hide, stop); the fade on real dimmable lights is still to check.
 - **Wake window (idea, not built):** ring early within a window if the phone app's "Sleep confidence" sensor (Google
   Sleep API, ~10 min updates) shows stirring. Health Connect only gives sleep duration after the night, so true
   light-sleep detection isn't available through Home Assistant.
