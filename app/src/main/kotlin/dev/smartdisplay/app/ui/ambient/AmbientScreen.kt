@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +52,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -252,8 +255,15 @@ private fun AmbientContent(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
-                FilledTonalButton(onClick = onImUp, modifier = Modifier.padding(top = 12.dp, bottom = 16.dp)) {
-                    Text(stringResource(R.string.sunrise_im_up), style = MaterialTheme.typography.titleMedium)
+                // Big and bold: it's meant to be found by someone half awake.
+                Button(
+                    onClick = onImUp,
+                    modifier = Modifier
+                        .padding(top = 16.dp, bottom = 24.dp)
+                        .height(72.dp)
+                        .widthIn(min = 240.dp),
+                ) {
+                    Text(stringResource(R.string.sunrise_im_up), fontSize = 24.sp)
                 }
             }
             if (hint != null) {

@@ -46,7 +46,21 @@ Home Assistant.
     works while pinned). Rings stop after 10 minutes; snooze is 10 minutes.
   - Checked on a Pixel 6 (Android 17 beta): rings on time with the app showing, and with the app in the background
     and the screen off (wakes it); Snooze reschedules, Dismiss stops everything; a pending snooze survived an app
-    update. Not yet checked: the lights and speaker actions, and old/Fire tablets.
+    update; the alarm turns on the chosen lights (two on/off lamps, 2026-10-09). Not yet checked: the speaker
+    action, and old/Fire tablets.
+- **Sunrise before an alarm (added 2026-10-09):** Settings > "Sunrise before the alarm": off, 10, 20, 30 (default) or
+  45 min. A second exact alarm (`AlarmReceiver.ACTION_SUNRISE`) starts `AlarmService`'s sunrise: the alarm's lights
+  that are off go from 1% at 2000 K to 100% at 4000 K (`alarm/Sunrise.kt`; brightness rises with progress², steps
+  every 30 s, with `transition` on lights that support it; colour lights without colour temperature get it
+  converted by Home Assistant). Lights already on are left alone; one turned off during it stays off. On/off-only
+  lights just come on at the ring. The ambient screen glows (`SunriseGlow`, over the night dimming and idle dim)
+  with a large "I'm up" button (also in the notification), which brings the lights up and skips that ring
+  (`Skip`; a one-time alarm turns off). The ring itself is at normal volume: the owner wants the gentle part to be
+  light only. An alarm set for sooner than the sunrise squeezes it into the time left. Checked on the Pixel with two
+  on/off lamps (glow, ring, lamps on at the ring, "I'm up"); the fade itself waits for dimmable bulbs.
+- **Wake window (idea, not built):** ring early within a window if the phone app's "Sleep confidence" sensor (Google
+  Sleep API, ~10 min updates) shows stirring. Health Connect only gives sleep duration after the night, so true
+  light-sleep detection isn't available through Home Assistant.
 
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
 `CLAUDE.local.md`, which is not committed. Keep personal details out of committed files and commit messages.
