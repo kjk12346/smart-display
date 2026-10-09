@@ -1,6 +1,7 @@
 package dev.smartdisplay.app.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
@@ -46,9 +48,12 @@ fun GuestSettings(
     onAllowed: (entityId: String, allowed: Boolean) -> Unit,
     onExtra: (entityId: String, included: Boolean) -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+    ) {
         FilterChip(
-            selected = !kiosk.isGuest,
+            selected = kiosk.mode == DisplayMode.Owner,
             onClick = { onMode(DisplayMode.Owner) },
             label = { Text(stringResource(R.string.mode_owner)) },
         )
@@ -57,9 +62,20 @@ fun GuestSettings(
             onClick = { onMode(DisplayMode.Guest) },
             label = { Text(stringResource(R.string.mode_guest)) },
         )
+        FilterChip(
+            selected = kiosk.isKitchen,
+            onClick = { onMode(DisplayMode.Kitchen) },
+            label = { Text(stringResource(R.string.mode_kitchen)) },
+        )
     }
     PanelBody(
-        stringResource(if (kiosk.isGuest) R.string.mode_guest_body else R.string.mode_owner_body),
+        stringResource(
+            when (kiosk.mode) {
+                DisplayMode.Owner -> R.string.mode_owner_body
+                DisplayMode.Guest -> R.string.mode_guest_body
+                DisplayMode.Kitchen -> R.string.mode_kitchen_body
+            }
+        ),
         topPadding = 4.dp,
     )
     if (!kiosk.isGuest) return

@@ -93,23 +93,16 @@ fun AmbientScreen(
     wallpaperConfig: WallpaperConfig,
     onOpenControls: () -> Unit,
     onOpenSettings: () -> Unit,
+    /** Keep showing photos (dimmed) in quiet hours: for a kitchen, which needn't be dark like a bedroom. */
+    photosAtNight: Boolean = false,
     viewModel: AmbientViewModel = viewModel(),
 ) {
     val weather = home.primaryWeatherEntity()?.toCurrentWeather()
-    val connected = home.status == ConnectionStatus.Connected
-
-    // Refresh the forecast only while connected and on screen.
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(connected, weather?.entityId) {
-        val entityId = weather?.entityId
-        if (connected && entityId != null) {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepForecastFresh(entityId) }
-        }
-    }
-    val forecast by viewModel.forecast.collectAsStateWithLifecycle()
-
     val now by rememberMinuteClock()
     val quiet = isQuietHours(now.toLocalTime())
+    val photos = !quiet || photosAtNight
+    KeepWeatherAndPhotosFresh(viewModel, home, weather?.entityId, wallpaperConfig, photos)
+    val forecast by viewModel.forecast.collectAsStateWithLifecycle()
 
     // Before an alarm with a sunrise, the screen glows brighter and warmer (over the night dimming) until it rings.
     val sunrise by AlarmService.sunrise.collectAsStateWithLifecycle()
@@ -130,23 +123,10 @@ fun AmbientScreen(
         }
     )
 
-    // Photos behind the clock, except at night: a dark room should stay dark.
-    LaunchedEffect(connected, wallpaperConfig, quiet) {
-        if (connected && !quiet) {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepWallpaperFresh(wallpaperConfig) }
-        }
-    }
     val wallpaper by viewModel.wallpaper.collectAsStateWithLifecycle()
-    val wallpaperUrl = wallpaper?.takeIf { !quiet && it.folderId == wallpaperConfig.folderId }?.url
-
-    val alarms = (LocalContext.current.applicationContext as SmartDisplayApp).alarms
-    val alarmList by alarms.alarms.collectAsStateWithLifecycle()
-    val snooze by alarms.snooze.collectAsStateWithLifecycle()
-    val skip by alarms.skip.collectAsStateWithLifecycle()
+    val wallpaperUrl = wallpaper?.takeIf { photos && it.folderId == wallpaperConfig.folderId }?.url
+    val nextAlarm = rememberNextAlarmText(now)
     val context = LocalContext.current
-    val nextAlarm = remember(alarmList, snooze, skip, now) {
-        nextRing(alarmList, snooze, now.atZone(ZoneId.systemDefault()), skip)?.let { nextRingText(context, it) }
-    }
 
     AmbientContent(
         now = now,
@@ -164,6 +144,45 @@ fun AmbientScreen(
         onTap = onOpenControls,
         onLongPress = onOpenSettings,
     )
+}
+
+/**
+ * Keeps the forecast for [weatherEntityId] and the wallpaper photo fresh while this is on screen and connected; with
+ * [photos] false, the photos pause (a dark night). Shared by the ambient screen and the kitchen dashboard.
+ */
+@Composable
+internal fun KeepWeatherAndPhotosFresh(
+    viewModel: AmbientViewModel,
+    home: HomeState,
+    weatherEntityId: String?,
+    wallpaperConfig: WallpaperConfig,
+    photos: Boolean,
+) {
+    val connected = home.status == ConnectionStatus.Connected
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(connected, weatherEntityId) {
+        if (connected && weatherEntityId != null) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepForecastFresh(weatherEntityId) }
+        }
+    }
+    LaunchedEffect(connected, wallpaperConfig, photos) {
+        if (connected && photos) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepWallpaperFresh(wallpaperConfig) }
+        }
+    }
+}
+
+/** When the next alarm rings, as shown under the clock ("Sat 7:30 AM"), or null if none is set. */
+@Composable
+internal fun rememberNextAlarmText(now: LocalDateTime): String? {
+    val context = LocalContext.current
+    val alarms = (context.applicationContext as SmartDisplayApp).alarms
+    val alarmList by alarms.alarms.collectAsStateWithLifecycle()
+    val snooze by alarms.snooze.collectAsStateWithLifecycle()
+    val skip by alarms.skip.collectAsStateWithLifecycle()
+    return remember(alarmList, snooze, skip, now) {
+        nextRing(alarmList, snooze, now.atZone(ZoneId.systemDefault()), skip)?.let { nextRingText(context, it) }
+    }
 }
 
 @Composable
@@ -325,12 +344,12 @@ private const val MIN_MOVE_MS = 20_000L
 private const val MAX_MOVE_MS = 120_000L
 
 /**
- * A photo filling the screen, faded in over the last one, under a gradient that keeps the clock readable. Each photo
- * slowly pans and zooms ([PanZoom]) over the time it's shown; if it stays longer than [MAX_MOVE_MS], the move eases
- * back and forth.
+ * A photo filling the space, faded in over the last one, under a gradient that keeps the clock readable (unless
+ * [scrim] is false, for a photo tile). Each photo slowly pans and zooms ([PanZoom]) over the time it's shown; if it
+ * stays longer than [MAX_MOVE_MS], the move eases back and forth.
  */
 @Composable
-private fun WallpaperBackground(url: String, intervalMillis: Long) {
+internal fun WallpaperBackground(url: String, intervalMillis: Long, scrim: Boolean = true) {
     val context = LocalContext.current
     val moveMillis = intervalMillis.coerceIn(MIN_MOVE_MS, MAX_MOVE_MS).toInt()
     Crossfade(targetState = url, animationSpec = tween(1_500), label = "wallpaper") { shown ->
@@ -357,17 +376,19 @@ private fun WallpaperBackground(url: String, intervalMillis: Long) {
                 },
         )
     }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(SCRIM.copy(alpha = 0.35f), SCRIM.copy(alpha = 0.65f)))),
-    )
+    if (scrim) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(listOf(SCRIM.copy(alpha = 0.35f), SCRIM.copy(alpha = 0.65f)))),
+        )
+    }
 }
 
 private val SCRIM = Color.Black
 
 @Composable
-private fun Clock(now: LocalDateTime, nextAlarm: String?, size: Dp, alignment: Alignment.Horizontal) {
+internal fun Clock(now: LocalDateTime, nextAlarm: String?, size: Dp, alignment: Alignment.Horizontal) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val use24Hour = DateFormat.is24HourFormat(context)
@@ -459,7 +480,7 @@ private fun highLowText(forecast: DailyForecast): String? {
 }
 
 @Composable
-private fun conditionLabel(condition: String, night: Boolean): String {
+internal fun conditionLabel(condition: String, night: Boolean): String {
     @StringRes val label: Int? = when (condition) {
         "clear-night" -> R.string.weather_clear
         "sunny" -> if (night) R.string.weather_clear else R.string.weather_sunny

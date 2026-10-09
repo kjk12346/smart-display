@@ -1,7 +1,10 @@
 package dev.smartdisplay.app.kiosk
 
-/** Whether the display is the owner's (every room) or a guest room's (one room, plus chosen extras). */
-enum class DisplayMode { Owner, Guest }
+/**
+ * Who the display is for: the owner (every room), a guest room (one room, plus chosen extras), or a family's shared
+ * kitchen (a daytime dashboard; every room, like the owner).
+ */
+enum class DisplayMode { Owner, Guest, Kitchen }
 
 /**
  * What a guest-room display may control: the controllable devices in [areaId] except [hidden], plus [extras] from

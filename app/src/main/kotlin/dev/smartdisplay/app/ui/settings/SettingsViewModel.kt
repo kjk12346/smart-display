@@ -8,6 +8,7 @@ import dev.smartdisplay.app.ha.MediaItem
 import dev.smartdisplay.app.kiosk.DisplayMode
 import dev.smartdisplay.app.kiosk.HomeApp
 import dev.smartdisplay.app.kiosk.KioskConfig
+import dev.smartdisplay.app.kiosk.KitchenConfig
 import dev.smartdisplay.app.kiosk.PinCheck
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
@@ -69,6 +70,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         kiosk.setMode(mode)
         return null
     }
+
+    fun setKitchen(kitchen: KitchenConfig) = kiosk.setKitchen(kitchen)
 
     /** Chooses the guest's room. Devices hidden in the previous room no longer apply. */
     fun setGuestArea(areaId: String) {

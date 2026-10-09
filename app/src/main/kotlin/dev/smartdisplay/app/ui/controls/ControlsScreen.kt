@@ -53,6 +53,7 @@ import dev.smartdisplay.app.R
 import dev.smartdisplay.app.ha.ConnectionStatus
 import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.kiosk.GuestConfig
+import dev.smartdisplay.app.ui.common.ReturnWhenIdle
 import kotlinx.coroutines.delay
 
 /** After this long without a touch, the display goes back to the clock. */
@@ -268,28 +269,3 @@ private fun GuestGrid(home: HomeState, rooms: List<Room>, ownAreaId: String?, on
     }
 }
 
-/**
- * Calls [onIdle] once [timeoutMillis] pass with no touch anywhere in [content]. Touches are observed on the way
- * down, without consuming them.
- */
-@Composable
-private fun ReturnWhenIdle(timeoutMillis: Long, onIdle: () -> Unit, content: @Composable () -> Unit) {
-    var touches by remember { mutableIntStateOf(0) }
-    val currentOnIdle by rememberUpdatedState(onIdle)
-    LaunchedEffect(touches) {
-        delay(timeoutMillis)
-        currentOnIdle()
-    }
-    Box(
-        Modifier.pointerInput(Unit) {
-            awaitPointerEventScope {
-                while (true) {
-                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                    if (event.type == PointerEventType.Press) touches++
-                }
-            }
-        }
-    ) {
-        content()
-    }
-}

@@ -25,6 +25,11 @@ class AmbientViewModel(application: Application) : AndroidViewModel(application)
     /** The forecast and the weather entity it belongs to. */
     val forecast: StateFlow<Pair<String, DailyForecast>?> = _forecast.asStateFlow()
 
+    private val _forecastDays = MutableStateFlow<Pair<String, List<ForecastDay>>?>(null)
+
+    /** The days ahead, and the weather entity they belong to, for the kitchen dashboard. */
+    val forecastDays: StateFlow<Pair<String, List<ForecastDay>>?> = _forecastDays.asStateFlow()
+
     private var fetchedAt = 0L
     private var fetchedFor: String? = null
 
@@ -64,6 +69,7 @@ class AmbientViewModel(application: Application) : AndroidViewModel(application)
             returnResponse = true,
         )
         parseDailyForecast(result, entityId)?.let { _forecast.value = entityId to it }
+        _forecastDays.value = entityId to parseForecastDays(result, entityId)
         fetchedAt = System.currentTimeMillis()
         fetchedFor = entityId
         true

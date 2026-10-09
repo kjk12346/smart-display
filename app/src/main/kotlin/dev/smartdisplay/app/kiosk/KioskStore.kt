@@ -6,6 +6,9 @@ import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 
 /** The display's kiosk options, as chosen in Settings. */
 data class KioskConfig(
@@ -20,8 +23,10 @@ data class KioskConfig(
     val mode: DisplayMode = DisplayMode.Owner,
     val guest: GuestConfig = GuestConfig(),
     val wallpaper: WallpaperConfig = WallpaperConfig(),
+    val kitchen: KitchenConfig = KitchenConfig(),
 ) {
     val isGuest: Boolean get() = mode == DisplayMode.Guest
+    val isKitchen: Boolean get() = mode == DisplayMode.Kitchen
 
     /** Home app, pinning or guest mode is on: the display shouldn't be left without the PIN. */
     val locked: Boolean get() = homeApp || pinApp || isGuest
@@ -57,6 +62,12 @@ class KioskStore(context: Context) {
         putString(KEY_WALLPAPER_FOLDER, wallpaper.folderId)
         putString(KEY_WALLPAPER_TITLE, wallpaper.folderTitle)
         putInt(KEY_WALLPAPER_INTERVAL, wallpaper.intervalMinutes)
+    }
+
+    fun setKitchen(kitchen: KitchenConfig) = update {
+        putString(KEY_KITCHEN_SHORTCUTS, encodeIds(kitchen.shortcuts))
+        putString(KEY_KITCHEN_HOME, kitchen.homeAction)
+        putString(KEY_KITCHEN_AWAY, kitchen.awayAction)
     }
 
     fun setPin(pin: String) {
@@ -111,6 +122,11 @@ class KioskStore(context: Context) {
             folderTitle = prefs.getString(KEY_WALLPAPER_TITLE, null),
             intervalMinutes = prefs.getInt(KEY_WALLPAPER_INTERVAL, 5),
         ),
+        kitchen = KitchenConfig(
+            shortcuts = decodeIds(prefs.getString(KEY_KITCHEN_SHORTCUTS, null)),
+            homeAction = prefs.getString(KEY_KITCHEN_HOME, null),
+            awayAction = prefs.getString(KEY_KITCHEN_AWAY, null),
+        ),
     )
 
     private companion object {
@@ -127,5 +143,16 @@ class KioskStore(context: Context) {
         const val KEY_WALLPAPER_FOLDER = "wallpaper_folder"
         const val KEY_WALLPAPER_TITLE = "wallpaper_title"
         const val KEY_WALLPAPER_INTERVAL = "wallpaper_interval"
+        const val KEY_KITCHEN_SHORTCUTS = "kitchen_shortcuts"
+        const val KEY_KITCHEN_HOME = "kitchen_home"
+        const val KEY_KITCHEN_AWAY = "kitchen_away"
     }
+}
+
+/** An ordered list of entity IDs, stored as a JSON array (string sets lose the order). */
+internal fun encodeIds(ids: List<String>): String = JsonArray(ids.map(::JsonPrimitive)).toString()
+
+internal fun decodeIds(text: String?): List<String> {
+    val array = text?.let { runCatching { Json.parseToJsonElement(it) }.getOrNull() } as? JsonArray ?: return emptyList()
+    return array.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }.distinct()
 }

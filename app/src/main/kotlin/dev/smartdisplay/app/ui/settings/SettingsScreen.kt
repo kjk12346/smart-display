@@ -87,6 +87,7 @@ fun SettingsScreen(
             onExtra = viewModel::setGuestExtra,
         )
         modeProblem?.let { ProblemText(it) }
+        if (kiosk.isKitchen) KitchenSettings(kiosk.kitchen, home, viewModel::setKitchen)
 
         Section(stringResource(R.string.settings_display))
         SwitchRow(

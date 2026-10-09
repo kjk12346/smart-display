@@ -2,7 +2,10 @@ package dev.smartdisplay.app.ui.ambient
 
 import dev.smartdisplay.app.ha.EntityState
 import dev.smartdisplay.app.ha.HomeState
+import java.time.LocalDate
 import java.time.LocalTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
 import kotlin.math.roundToInt
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -52,6 +55,35 @@ fun parseDailyForecast(result: JsonElement, entityId: String): DailyForecast? {
     val high = (today["temperature"] as? JsonPrimitive)?.doubleOrNull
     val low = (today["templow"] as? JsonPrimitive)?.doubleOrNull
     return if (high == null && low == null) null else DailyForecast(high, low)
+}
+
+/** One day of a forecast, for the kitchen dashboard's forecast strip. */
+data class ForecastDay(val date: LocalDate, val condition: String?, val high: Double?, val low: Double?)
+
+/**
+ * Reads every day from a `weather.get_forecasts` (daily) result, in [zone]'s calendar days. Each entry's `datetime`
+ * is an ISO timestamp (or a date); days that can't be read are skipped.
+ */
+fun parseForecastDays(
+    result: JsonElement,
+    entityId: String,
+    zone: ZoneId = ZoneId.systemDefault(),
+): List<ForecastDay> {
+    val response = (result as? JsonObject)?.get("response") as? JsonObject ?: return emptyList()
+    val forecast = (response[entityId] as? JsonObject)?.get("forecast") as? JsonArray ?: return emptyList()
+    return forecast.mapNotNull { item ->
+        val day = item as? JsonObject ?: return@mapNotNull null
+        val text = (day["datetime"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return@mapNotNull null
+        val date = runCatching { OffsetDateTime.parse(text).atZoneSameInstant(zone).toLocalDate() }
+            .recoverCatching { LocalDate.parse(text.take(10)) }
+            .getOrNull() ?: return@mapNotNull null
+        ForecastDay(
+            date = date,
+            condition = (day["condition"] as? JsonPrimitive)?.takeIf { it.isString }?.content,
+            high = (day["temperature"] as? JsonPrimitive)?.doubleOrNull,
+            low = (day["templow"] as? JsonPrimitive)?.doubleOrNull,
+        )
+    }.distinctBy { it.date }
 }
 
 /** Whole degrees with a degree sign; the unit is left out, as on most displays. */

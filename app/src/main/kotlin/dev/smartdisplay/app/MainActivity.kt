@@ -20,6 +20,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -36,14 +37,18 @@ import dev.smartdisplay.app.auth.SessionState
 import dev.smartdisplay.app.kiosk.HomeApp
 import dev.smartdisplay.app.ui.alarms.AlarmsScreen
 import dev.smartdisplay.app.ui.ambient.AmbientScreen
+import dev.smartdisplay.app.ui.ambient.isQuietHours
 import dev.smartdisplay.app.ui.common.HideSystemBars
 import dev.smartdisplay.app.ui.common.KeepScreenOn
 import dev.smartdisplay.app.ui.common.LocalNetworkPrompt
 import dev.smartdisplay.app.ui.common.LocalWindowBrightness
 import dev.smartdisplay.app.ui.common.LockTask
+import dev.smartdisplay.app.ui.common.ReturnWhenIdle
+import dev.smartdisplay.app.ui.common.rememberMinuteClock
 import dev.smartdisplay.app.ui.common.WindowBrightness
 import dev.smartdisplay.app.ui.common.rememberLocalNetworkAccess
 import dev.smartdisplay.app.ui.controls.ControlsScreen
+import dev.smartdisplay.app.ui.dashboard.DashboardScreen
 import dev.smartdisplay.app.ui.settings.EnterPinDialog
 import dev.smartdisplay.app.ui.settings.SettingsScreen
 import dev.smartdisplay.app.ui.settings.checkExitPin
@@ -270,12 +275,20 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
         session == SessionState.SignedIn -> {
             // Collecting keeps the live connection open while these screens are showing.
             val home by app.home.state.collectAsStateWithLifecycle()
-            var screen by rememberSaveable { mutableStateOf(Screen.Ambient) }
+            // The resting screen: a kitchen display's dashboard by day; otherwise, and at night, the clock.
+            val now by rememberMinuteClock()
+            val night = isQuietHours(now.toLocalTime())
+            val rest = if (kiosk.isKitchen && !night) Screen.Dashboard else Screen.Ambient
+            var screen by rememberSaveable { mutableStateOf(rest) }
+            // Morning and night (and switching to or from kitchen mode) move the resting screen; follow it, unless
+            // someone is using another screen.
+            LaunchedEffect(rest) { if (screen == Screen.Ambient || screen == Screen.Dashboard) screen = rest }
             var askingPin by rememberSaveable { mutableStateOf(false) }
             // The power button in a kiosk wakes the display straight back to the clock (MainActivity.onScreenOff).
+            val currentRest by rememberUpdatedState(rest)
             LaunchedEffect(screenOffs) {
                 screenOffs.collect {
-                    screen = Screen.Ambient
+                    screen = currentRest
                     askingPin = false
                 }
             }
@@ -293,23 +306,43 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                 Screen.Ambient -> AmbientScreen(
                     home = home,
                     wallpaperConfig = kiosk.wallpaper,
-                    onOpenControls = { screen = Screen.Controls },
+                    onOpenControls = { screen = if (kiosk.isKitchen) Screen.Dashboard else Screen.Controls },
                     onOpenSettings = openSettings,
+                    photosAtNight = kiosk.isKitchen,
                 )
+                Screen.Dashboard -> {
+                    // At night the dashboard is only visited: back to the clock after a while untouched.
+                    val dashboard = @Composable {
+                        DashboardScreen(
+                            home = home,
+                            kitchen = kiosk.kitchen,
+                            wallpaperConfig = kiosk.wallpaper,
+                            onOpenControls = { screen = Screen.Controls },
+                            onOpenAlarms = { screen = Screen.Alarms },
+                            onOpenSettings = openSettings,
+                        )
+                    }
+                    if (rest == Screen.Ambient) {
+                        ReturnWhenIdle(DASHBOARD_NIGHT_IDLE_MS, onIdle = { screen = Screen.Ambient }) { dashboard() }
+                    } else {
+                        dashboard()
+                    }
+                }
                 Screen.Controls -> ControlsScreen(
                     home = home,
                     guest = kiosk.guest.takeIf { kiosk.isGuest },
-                    onDone = { screen = Screen.Ambient },
+                    onDone = { screen = rest },
                     onOpenSettings = openSettings,
                     onOpenAlarms = { screen = Screen.Alarms },
                 )
-                Screen.Alarms -> AlarmsScreen(onDone = { screen = Screen.Controls })
+                // Alarms opens from Controls, or from the kitchen dashboard.
+                Screen.Alarms -> AlarmsScreen(onDone = { screen = if (kiosk.isKitchen) rest else Screen.Controls })
                 Screen.Settings -> SettingsScreen(
                     server = current,
                     home = home,
-                    onBack = { screen = Screen.Ambient },
+                    onBack = { screen = rest },
                     onSignOut = {
-                        screen = Screen.Ambient
+                        screen = rest
                         scope.launch { app.session.signOut() }
                     },
                 )
@@ -335,4 +368,7 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
 }
 
 /** The screens once signed in. */
-private enum class Screen { Ambient, Controls, Alarms, Settings }
+private enum class Screen { Ambient, Dashboard, Controls, Alarms, Settings }
+
+/** How long the kitchen dashboard stays up at night without a touch before the clock comes back. */
+private const val DASHBOARD_NIGHT_IDLE_MS = 2 * 60_000L

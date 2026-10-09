@@ -173,7 +173,7 @@ private enum class Choosing { Lights, Speaker, Sound }
 
 /** Ticks entities from a list: several ([multiple]) or one. */
 @Composable
-private fun ChoiceDialog(
+internal fun ChoiceDialog(
     title: String,
     items: List<Pair<String, String>>,
     selected: Set<String>,
