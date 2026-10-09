@@ -21,7 +21,17 @@ data class KitchenConfig(
      * of a repeating event), overriding whose calendar they're on.
      */
     val eventPeople: Map<String, List<String>> = emptyMap(),
+    /**
+     * By day, minutes untouched before the dashboard gives way to the clock over the photos, which moves against
+     * burn-in; 0 for never. At night it always does, after 2 minutes.
+     */
+    val screensaverMinutes: Int = DEFAULT_SCREENSAVER_MINUTES,
 )
+
+const val DEFAULT_SCREENSAVER_MINUTES = 10
+
+/** The screensaver times Settings offers; 0 is never. */
+val SCREENSAVER_CHOICES = listOf(0, 2, 5, 10, 15, 30)
 
 /** The colors a person can have on the calendar, in the order they're handed out. */
 enum class PersonColor { Pink, Blue, Lavender, Mint, Peach, Butter, Coral, Sky }

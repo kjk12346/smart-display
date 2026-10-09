@@ -1,5 +1,7 @@
 package dev.smartdisplay.app.ui.dashboard
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -61,6 +64,7 @@ import dev.smartdisplay.app.ui.ambient.ForecastDay
 import dev.smartdisplay.app.ui.ambient.KeepWeatherAndPhotosFresh
 import dev.smartdisplay.app.ui.ambient.WallpaperBackground
 import dev.smartdisplay.app.ui.ambient.WeatherIcon
+import dev.smartdisplay.app.ui.ambient.burnInOffset
 import dev.smartdisplay.app.ui.ambient.conditionLabel
 import dev.smartdisplay.app.ui.ambient.formatTemperature
 import dev.smartdisplay.app.ui.ambient.primaryWeatherEntity
@@ -230,12 +234,19 @@ fun DashboardScreen(
         )
     }
 
+    // The whole dashboard drifts a few pixels each minute, like the clock, so nothing sits in one place all day.
+    val epochMinute = now.toLocalDate().toEpochDay() * 1_440 + now.hour * 60 + now.minute
+    val (shiftX, shiftY) = burnInOffset(epochMinute)
+    val driftX by animateDpAsState(shiftX.dp, tween(DRIFT_MS), label = "driftX")
+    val driftY by animateDpAsState(shiftY.dp, tween(DRIFT_MS), label = "driftY")
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .offset(driftX, driftY),
     ) {
         if (maxWidth > maxHeight && maxWidth >= 720.dp) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -275,6 +286,7 @@ fun DashboardScreen(
 }
 
 private const val FORECAST_DAYS = 5
+private const val DRIFT_MS = 2_000
 
 @Composable
 private fun ForecastStrip(days: List<ForecastDay>, today: LocalDate) {

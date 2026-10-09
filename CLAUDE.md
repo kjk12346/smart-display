@@ -99,6 +99,9 @@ Home Assistant.
   stack calendar first and scroll; cards must not scroll by themselves there (nested vertical scrolling crashes).
 - Checked on the Pixel 6 in portrait and landscape (2026-10-09). Not yet on a tablet, or with calendars assigned to
   people.
+- **Burn-in:** by day the dashboard gives way to the clock over the photos (the ambient screen, which already drifts)
+  after `KitchenConfig.screensaverMinutes` untouched (Settings, default 10, or never); at night after 2 minutes, as
+  before. A tap brings the dashboard back. The dashboard itself also drifts by `burnInOffset` each minute.
 
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
 `CLAUDE.local.md`, which is not committed. Keep personal details out of committed files and commit messages.

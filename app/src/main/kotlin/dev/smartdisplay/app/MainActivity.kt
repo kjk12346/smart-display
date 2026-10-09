@@ -323,10 +323,15 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                             onOpenSettings = openSettings,
                         )
                     }
-                    if (rest == Screen.Ambient) {
-                        ReturnWhenIdle(DASHBOARD_NIGHT_IDLE_MS, onIdle = { screen = Screen.Ambient }) { dashboard() }
-                    } else {
-                        dashboard()
+                    // Left alone, it gives way to the clock: soon at night, and by day after the screensaver time,
+                    // so a still dashboard doesn't burn into the screen. A tap on the clock brings it back.
+                    val screensaver = kiosk.kitchen.screensaverMinutes
+                    when {
+                        rest == Screen.Ambient ->
+                            ReturnWhenIdle(DASHBOARD_NIGHT_IDLE_MS, onIdle = { screen = Screen.Ambient }) { dashboard() }
+                        screensaver > 0 ->
+                            ReturnWhenIdle(screensaver * 60_000L, onIdle = { screen = Screen.Ambient }) { dashboard() }
+                        else -> dashboard()
                     }
                 }
                 Screen.Controls -> ControlsScreen(

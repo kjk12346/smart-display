@@ -73,6 +73,7 @@ class KioskStore(context: Context) {
         putString(KEY_KITCHEN_CALENDAR_OWNERS, encodeMap(kitchen.calendarOwners))
         putString(KEY_KITCHEN_PERSON_COLORS, encodeMap(kitchen.personColors.mapValues { it.value.name }))
         putString(KEY_KITCHEN_EVENT_PEOPLE, encodeListMap(kitchen.eventPeople))
+        putInt(KEY_KITCHEN_SCREENSAVER, kitchen.screensaverMinutes)
     }
 
     fun setPin(pin: String) {
@@ -137,6 +138,7 @@ class KioskStore(context: Context) {
                 PersonColor.entries.firstOrNull { it.name == name }?.let { person to it }
             }.toMap(),
             eventPeople = decodeListMap(prefs.getString(KEY_KITCHEN_EVENT_PEOPLE, null)),
+            screensaverMinutes = prefs.getInt(KEY_KITCHEN_SCREENSAVER, DEFAULT_SCREENSAVER_MINUTES),
         ),
     )
 
@@ -161,6 +163,7 @@ class KioskStore(context: Context) {
         const val KEY_KITCHEN_CALENDAR_OWNERS = "kitchen_calendar_owners"
         const val KEY_KITCHEN_PERSON_COLORS = "kitchen_person_colors"
         const val KEY_KITCHEN_EVENT_PEOPLE = "kitchen_event_people"
+        const val KEY_KITCHEN_SCREENSAVER = "kitchen_screensaver_minutes"
     }
 }
 

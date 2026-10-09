@@ -59,6 +59,8 @@
     <string name="kitchen_choose_home">Choose for Home</string>
     <string name="kitchen_choose_away">Choose for Away</string>
     <string name="kitchen_clear">Clear</string>
+    <string name="kitchen_screensaver">Screensaver</string>
+    <string name="kitchen_screensaver_body">After this long untouched, the dashboard gives way to the clock over your photos, which moves a little every minute so nothing burns into the screen. A tap brings the dashboard back. At night it\'s after 2 minutes.</string>
     <string name="kitchen_calendars">Calendars</string>
     <string name="kitchen_calendars_body">This week\'s events from Home Assistant\'s calendars, each in its person\'s color. A calendar that isn\'t one person\'s is the family\'s. Tap one to change whose it is, or to leave it off.</string>
     <string name="kitchen_calendar_family">Family (everyone)</string>
