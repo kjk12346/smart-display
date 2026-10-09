@@ -24,13 +24,17 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
+import okhttp3.Request
 
 /** Supplies access tokens for the connection; [dev.smartdisplay.app.auth.Session] implements it. */
 interface AccessTokenSource {
@@ -66,7 +70,7 @@ class Backoff(
  * [Backoff] when the connection drops.
  */
 class HomeAssistantClient(
-    http: OkHttpClient,
+    private val http: OkHttpClient,
     private val tokens: AccessTokenSource,
     private val serverUrl: () -> String?,
     scope: CoroutineScope,
@@ -124,6 +128,41 @@ class HomeAssistantClient(
             if (returnResponse) put("return_response", true)
         },
     )
+
+    /**
+     * Reads [path] from Home Assistant's REST API (for what the WebSocket API doesn't offer), signed in with the
+     * current access token. A token that turns out to have expired is refreshed and the request tried once more.
+     */
+    suspend fun restGet(path: String, query: Map<String, String> = emptyMap()): JsonElement {
+        val server = serverUrl()?.toHttpUrlOrNull() ?: throw NotConnectedException()
+        val url = server.newBuilder().addPathSegments(path.trimStart('/')).apply {
+            query.forEach { (name, value) -> addQueryParameter(name, value) }
+        }.build()
+        repeat(2) { attempt ->
+            val token = tokens.accessToken() ?: throw NotConnectedException()
+            val request = Request.Builder().url(url).header("Authorization", "Bearer $token").build()
+            val (code, body) = withContext(Dispatchers.IO) {
+                http.newCall(request).execute().use { it.code to it.body.string() }
+            }
+            when {
+                code == 401 && attempt == 0 -> tokens.invalidateAccessToken()
+                code !in 200..299 -> throw IOException("HTTP $code from /$path")
+                else -> return try {
+                    Json.parseToJsonElement(body)
+                } catch (e: IllegalArgumentException) {
+                    throw IOException("Unexpected response from /$path", e)
+                }
+            }
+        }
+        throw IOException("Not signed in for /$path")
+    }
+
+    /**
+     * The events on [calendarId] between [start] and [end] (ISO times), each with its ID, which the
+     * `calendar.get_events` action leaves out.
+     */
+    suspend fun calendarEvents(calendarId: String, start: String, end: String): JsonElement =
+        restGet("api/calendars/$calendarId", mapOf("start" to start, "end" to end))
 
     /** Lists a folder in Home Assistant's media browser; the empty ID is the top level. */
     suspend fun browseMedia(contentId: String = ""): MediaFolder =

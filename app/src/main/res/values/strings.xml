@@ -89,6 +89,13 @@
     <string name="calendar_tomorrow">Tomorrow</string>
     <string name="calendar_all_day">All day</string>
     <string name="calendar_until">Until %1$s</string>
+    <string name="event_untitled">(No title)</string>
+    <string name="event_from">From %1$s</string>
+    <string name="event_who">Who\'s it for?</string>
+    <string name="event_this_time">Just this time</string>
+    <string name="event_every_time">Every time</string>
+    <string name="event_none_chosen">With no one ticked, it shows as whose calendar it\'s on.</string>
+    <string name="event_display_only">Saved on this display only; the calendar itself doesn\'t change.</string>
     <string name="presence_home">Home</string>
     <string name="presence_away">Away</string>
     <string name="presence_unknown">Not known</string>

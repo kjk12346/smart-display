@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -63,6 +64,22 @@ class HomeAssistantClientTest {
         assertEquals(1, fake.tokensTried().size)
         assertEquals(ConnectionStatus.Connected, client.state.value.status)
         keepConnected.cancel()
+    }
+
+    @Test
+    fun `REST reads are signed in, and retried once with a fresh token`() = runBlocking {
+        fake.server.enqueue(mockwebserver3.MockResponse.Builder().code(401).build())
+        fake.server.enqueue(mockwebserver3.MockResponse.Builder().body("""[{"summary": "Dentist"}]""").build())
+        val tokens = FakeTokens("stale", afterRefresh = "good")
+        val result = client(tokens).calendarEvents("calendar.family", "2026-10-09T00:00:00-07:00", "2026-10-16T00:00:00-07:00")
+        assertEquals("Dentist", result.jsonArray[0].jsonObject["summary"]!!.jsonPrimitive.content)
+        assertEquals(1, tokens.invalidations)
+        val first = fake.server.takeRequest()
+        val second = fake.server.takeRequest()
+        assertEquals("Bearer stale", first.headers["Authorization"])
+        assertEquals("Bearer good", second.headers["Authorization"])
+        assertEquals("/api/calendars/calendar.family", second.url.encodedPath)
+        assertEquals("2026-10-09T00:00:00-07:00", second.url.queryParameter("start"))
     }
 
     private fun client(tokens: AccessTokenSource) = HomeAssistantClient(

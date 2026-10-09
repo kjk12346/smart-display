@@ -32,35 +32,87 @@ class CalendarModelTest {
     ) = ShownEvent(summary, LocalDateTime.parse(start), LocalDateTime.parse(end), allDay, owners)
 
     @Test
-    fun `reads timed and all-day events from each calendar, in the display's zone`() {
+    fun `reads events from the REST API, with their IDs, in the display's zone`() {
         val result = Json.parseToJsonElement(
             """
-            {"response": {
-              "calendar.family": {"events": [
-                {"start": "2026-10-09T17:30:00+00:00", "end": "2026-10-09T18:30:00+00:00", "summary": " Dentist "},
-                {"start": "2026-10-10", "end": "2026-10-11", "summary": "Bins out"},
-                {"summary": "No start"}
-              ]},
-              "calendar.work": {"events": [
-                {"start": "2026-10-09T09:00:00-07:00", "end": "2026-10-09T10:00:00-07:00", "summary": "Stand-up"}
-              ]}
-            }}
+            [
+              {"start": {"dateTime": "2026-10-09T17:30:00+00:00"}, "end": {"dateTime": "2026-10-09T18:30:00+00:00"},
+               "summary": " Dentist ", "uid": "abc@google.com", "recurrence_id": null,
+               "description": "Bring the form", "location": ""},
+              {"start": {"date": "2026-10-10"}, "end": {"date": "2026-10-11"}, "summary": "Bins out",
+               "uid": "bins@google.com", "recurrence_id": "20261010"},
+              {"summary": "No start"}
+            ]
             """,
         )
         assertEquals(
             listOf(
-                event("Dentist", "2026-10-09T10:30", "2026-10-09T11:30"),
-                event("Bins out", "2026-10-10T00:00", "2026-10-11T00:00", allDay = true),
-                event("Stand-up", "2026-10-09T09:00", "2026-10-09T10:00", calendar = "calendar.work"),
+                CalendarEvent(
+                    "calendar.family", "Dentist", LocalDateTime.parse("2026-10-09T10:30"),
+                    LocalDateTime.parse("2026-10-09T11:30"), allDay = false, uid = "abc@google.com",
+                    description = "Bring the form",
+                ),
+                CalendarEvent(
+                    "calendar.family", "Bins out", LocalDateTime.parse("2026-10-10T00:00"),
+                    LocalDateTime.parse("2026-10-11T00:00"), allDay = true, uid = "bins@google.com",
+                    recurrenceId = "20261010",
+                ),
             ),
-            parseCalendarEvents(result, zone),
+            parseCalendarApiEvents("calendar.family", result, zone),
         )
     }
 
     @Test
     fun `an unexpected answer gives no events`() {
-        assertTrue(parseCalendarEvents(Json.parseToJsonElement("""{"response": null}"""), zone).isEmpty())
-        assertTrue(parseCalendarEvents(Json.parseToJsonElement("[]"), zone).isEmpty())
+        assertTrue(parseCalendarApiEvents("calendar.a", Json.parseToJsonElement("{}"), zone).isEmpty())
+    }
+
+    @Test
+    fun `events are keyed by ID, and by time for one time of a repeating event`() {
+        val once = event("Dentist", "2026-10-09T10:00", "2026-10-09T11:00").copy(uid = "abc")
+        assertEquals("uid:abc", once.seriesKey)
+        assertEquals("uid:abc", once.instanceKey)
+        val weekly = once.copy(recurrenceId = "20261009")
+        assertEquals("uid:abc", weekly.seriesKey)
+        assertEquals("uid:abc#20261009", weekly.instanceKey)
+        val noId = event("Dentist", "2026-10-09T10:00", "2026-10-09T11:00")
+        assertEquals("at:Dentist|2026-10-09T10:00", noId.seriesKey)
+    }
+
+    @Test
+    fun `an event given to people shows as theirs, this time over every time`() {
+        val football = event("Football", "2026-10-10T10:00", "2026-10-10T11:00").copy(uid = "f", recurrenceId = "1010")
+        val people = setOf("person.sam", "person.alex")
+        fun ownersWith(assignments: Map<String, List<String>>) =
+            mergeEvents(listOf(football), { FAMILY }, assignments, people).single()
+
+        assertEquals(listOf(FAMILY), ownersWith(emptyMap()).owners)
+        assertEquals(Assignment.None, ownersWith(emptyMap()).assigned)
+
+        val everyWeek = mapOf("uid:f" to listOf("person.sam"))
+        assertEquals(listOf("person.sam"), ownersWith(everyWeek).owners)
+        assertEquals(Assignment.EveryTime, ownersWith(everyWeek).assigned)
+
+        val thisWeekToo = everyWeek + ("uid:f#1010" to listOf("person.alex"))
+        assertEquals(listOf("person.alex"), ownersWith(thisWeekToo).owners)
+        assertEquals(Assignment.ThisTime, ownersWith(thisWeekToo).assigned)
+
+        // Someone no longer in Home Assistant is dropped; with no one left, it's the calendar's again.
+        assertEquals(listOf(FAMILY), ownersWith(mapOf("uid:f" to listOf("person.gone"))).owners)
+    }
+
+    @Test
+    fun `assigning saves this time or every time, and no one clears it`() {
+        val shown = mergeEvents(
+            listOf(event("Football", "2026-10-10T10:00", "2026-10-10T11:00").copy(uid = "f", recurrenceId = "1010")),
+            { FAMILY },
+        ).single()
+        val thisTime = assign(emptyMap(), shown, listOf("person.sam"), everyTime = false)
+        assertEquals(mapOf("uid:f#1010" to listOf("person.sam")), thisTime)
+        // Every time replaces a choice made for this time.
+        val everyTime = assign(thisTime, shown, listOf("person.alex"), everyTime = true)
+        assertEquals(mapOf("uid:f" to listOf("person.alex")), everyTime)
+        assertEquals(emptyMap<String, List<String>>(), assign(everyTime, shown, emptyList(), everyTime = true))
     }
 
     @Test
@@ -72,7 +124,8 @@ class CalendarModelTest {
                 event("Dinner", "2026-10-09T19:00", "2026-10-09T21:00", calendar = "calendar.sam"),
                 event("Football", "2026-10-10T10:00", "2026-10-10T11:00", calendar = "calendar.sam"),
             ),
-        ) { owners[it] ?: FAMILY }
+            ownerOf = { owners[it] ?: FAMILY },
+        )
         assertEquals(
             listOf(listOf("person.joseph", "person.sam"), listOf("person.sam")),
             merged.map { it.owners },

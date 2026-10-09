@@ -122,11 +122,19 @@ fun DashboardScreen(
     }
     val personColor = { personId: String -> colors[personId]?.color() }
     fun ownerOf(calendarId: String) = calendarOwner(calendarId, kitchen.calendarOwners, colors.keys)
-    // People with a calendar shown, by name, then the family if any calendar is everyone's.
-    val owners = calendarIds.map(::ownerOf).toSet().let { ids ->
-        people.filter { it.entityId in ids }.sortedBy { it.name.lowercase() }.map { person ->
-            CalendarOwner(person.entityId, person.name.substringBefore(' '), personColor(person.entityId)!!)
-        } + listOfNotNull(
+    // Everyone in the household, by name, for giving events to.
+    val household = people.sortedBy { it.name.lowercase() }.map { person ->
+        CalendarOwner(person.entityId, person.name.substringBefore(' '), personColor(person.entityId)!!)
+    }
+    // Null until the first fetch for these calendars, so the card starts empty, not "nothing coming up".
+    val shownEvents = remember(events, calendarIds, kitchen.calendarOwners, kitchen.eventPeople, colors.keys) {
+        events?.takeIf { it.first == calendarIds }?.second?.let {
+            mergeEvents(it, ::ownerOf, kitchen.eventPeople, colors.keys)
+        }
+    }
+    // The chips: people with a calendar or an event shown, then the family if any of those is everyone's.
+    val owners = (calendarIds.map(::ownerOf) + shownEvents.orEmpty().flatMap { it.owners }).toSet().let { ids ->
+        household.filter { it.id in ids } + listOfNotNull(
             CalendarOwner(FAMILY, stringResource(R.string.calendar_family), FamilyColor).takeIf { FAMILY in ids },
         )
     }
@@ -195,12 +203,14 @@ fun DashboardScreen(
     val showCalendar = calendarIds.isNotEmpty()
     val calendarCard: @Composable (Modifier, Boolean) -> Unit = { modifier, bounded ->
         CalendarCard(
-            // Null until the first fetch for these calendars, so the card starts empty, not "nothing coming up".
-            events = events?.takeIf { it.first == calendarIds }?.second?.let { mergeEvents(it, ::ownerOf) },
+            events = shownEvents,
             owners = owners,
+            people = household,
             selected = selected,
             onToggle = { viewModel.toggleOwner(it, owners.map { owner -> owner.id }) },
             onEveryone = viewModel::showEveryone,
+            calendarName = { names[it]?.friendlyName ?: it },
+            onAssign = viewModel::assign,
             now = now,
             bounded = bounded,
             modifier = modifier,

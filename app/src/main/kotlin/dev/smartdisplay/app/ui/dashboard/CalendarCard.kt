@@ -2,6 +2,7 @@ package dev.smartdisplay.app.ui.dashboard
 
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -58,6 +63,8 @@ private const val MIN_GRID_DAYS = 3
  * The family calendar: a chip per person (and the family) to show only theirs, then the days ahead as a column per
  * day, as many as fit up to a week, or as a list by day where even a few don't. Each event is in its owner's color.
  *
+ * Tapping an event opens its details, where it can be given to [people] ([onAssign]).
+ *
  * [events] is null until they've been fetched. In a column of fixed height ([bounded]) the days scroll by
  * themselves; stacked in a page that scrolls, they mustn't.
  */
@@ -65,16 +72,30 @@ private const val MIN_GRID_DAYS = 3
 internal fun CalendarCard(
     events: List<ShownEvent>?,
     owners: List<CalendarOwner>,
+    people: List<CalendarOwner>,
     selected: Set<String>,
     onToggle: (String) -> Unit,
     onEveryone: () -> Unit,
+    calendarName: (calendarId: String) -> String,
+    onAssign: (event: ShownEvent, people: List<String>, everyTime: Boolean) -> Unit,
     now: LocalDateTime,
     bounded: Boolean,
     modifier: Modifier,
 ) {
-    val colors = owners.associate { it.id to it.color }
+    val colors = (owners + people).associate { it.id to it.color }
     val colorOf = { owner: String -> colors[owner] ?: Color.Gray }
     val shown = events?.forOwners(selected)
+    var open by remember { mutableStateOf<ShownEvent?>(null) }
+    val onOpen = { event: ShownEvent -> open = event }
+    open?.let { event ->
+        EventDialog(
+            event = event,
+            people = people,
+            calendarName = calendarName,
+            onSave = { chosen, everyTime -> onAssign(event, chosen, everyTime) },
+            onDismiss = { open = null },
+        )
+    }
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(24.dp), modifier = modifier) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -93,13 +114,13 @@ internal fun CalendarCard(
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                     val fit = (maxWidth / MIN_DAY_WIDTH).toInt().coerceAtMost(CALENDAR_DAYS)
                     if (fit >= MIN_GRID_DAYS) {
-                        WeekGrid(shown, now, fit, colorOf)
+                        WeekGrid(shown, now, fit, colorOf, onOpen)
                     } else {
-                        Agenda(shown, now, colorOf, Modifier.verticalScroll(rememberScrollState()))
+                        Agenda(shown, now, colorOf, onOpen, Modifier.verticalScroll(rememberScrollState()))
                     }
                 }
             } else {
-                Agenda(shown, now, colorOf, Modifier)
+                Agenda(shown, now, colorOf, onOpen, Modifier)
             }
         }
     }
@@ -146,7 +167,13 @@ private fun OwnerChips(
 
 /** A column for each of [dayCount] days, today first; each column scrolls if its day is full. */
 @Composable
-private fun WeekGrid(events: List<ShownEvent>?, now: LocalDateTime, dayCount: Int, colorOf: (String) -> Color) {
+private fun WeekGrid(
+    events: List<ShownEvent>?,
+    now: LocalDateTime,
+    dayCount: Int,
+    colorOf: (String) -> Color,
+    onOpen: (ShownEvent) -> Unit,
+) {
     val today = now.toLocalDate()
     val days = week(events.orEmpty(), today, dayCount)
     val locale = LocalConfiguration.current.locales[0]
@@ -191,7 +218,9 @@ private fun WeekGrid(events: List<ShownEvent>?, now: LocalDateTime, dayCount: In
                         .verticalScroll(rememberScrollState()),
                 ) {
                     day.events.forEach { event ->
-                        EventChip(event, gridTimeLabel(event, day.date), past = event.end <= now, colorOf)
+                        EventChip(event, gridTimeLabel(event, day.date), past = event.end <= now, colorOf) {
+                            onOpen(event)
+                        }
                     }
                 }
             }
@@ -204,7 +233,13 @@ private fun WeekGrid(events: List<ShownEvent>?, now: LocalDateTime, dayCount: In
  * An event shared by several people shows the others' colors as dots.
  */
 @Composable
-private fun EventChip(event: ShownEvent, time: String?, past: Boolean, colorOf: (String) -> Color) {
+private fun EventChip(
+    event: ShownEvent,
+    time: String?,
+    past: Boolean,
+    colorOf: (String) -> Color,
+    onClick: () -> Unit,
+) {
     val color = colorOf(event.owners.first())
     val others: @Composable () -> Unit = {
         if (event.owners.size > 1) {
@@ -216,7 +251,7 @@ private fun EventChip(event: ShownEvent, time: String?, past: Boolean, colorOf: 
         }
     }
     val shape = RoundedCornerShape(10.dp)
-    val modifier = Modifier.fillMaxWidth().alpha(if (past) 0.45f else 1f).clip(shape)
+    val modifier = Modifier.fillMaxWidth().alpha(if (past) 0.45f else 1f).clip(shape).clickable(onClick = onClick)
     if (event.allDay) {
         Column(modifier = modifier.background(color).padding(horizontal = 8.dp, vertical = 6.dp)) {
             Text(
@@ -250,7 +285,13 @@ private fun EventChip(event: ShownEvent, time: String?, past: Boolean, colorOf: 
 
 /** A list by day, for narrow screens: each event once, under its first day still to come. */
 @Composable
-private fun Agenda(events: List<ShownEvent>?, now: LocalDateTime, colorOf: (String) -> Color, modifier: Modifier) {
+private fun Agenda(
+    events: List<ShownEvent>?,
+    now: LocalDateTime,
+    colorOf: (String) -> Color,
+    onOpen: (ShownEvent) -> Unit,
+    modifier: Modifier,
+) {
     val today = now.toLocalDate()
     val locale = LocalConfiguration.current.locales[0]
     val days = events?.let { agenda(it, now) }
@@ -275,7 +316,13 @@ private fun Agenda(events: List<ShownEvent>?, now: LocalDateTime, colorOf: (Stri
             )
             day.events.forEach { event ->
                 // The name gets the whole width, with the time under it.
-                Row(modifier = Modifier.padding(vertical = 5.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onOpen(event) }
+                        .padding(vertical = 5.dp),
+                ) {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(3.dp),
                         modifier = Modifier.padding(top = 7.dp),
@@ -340,7 +387,7 @@ private fun agendaTimeLabel(event: ShownEvent, day: LocalDate, locale: Locale): 
     }
 }
 
-private fun dayName(date: LocalDate, locale: Locale): String =
+internal fun dayName(date: LocalDate, locale: Locale): String =
     formatDate(date.atStartOfDay(), DateFormat.getBestDateTimePattern(locale, "EEEMMMd"), locale)
 
 /** Formats with a locale's best pattern, falling back if java.time doesn't know one of its letters. */

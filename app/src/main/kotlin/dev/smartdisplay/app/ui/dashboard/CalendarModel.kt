@@ -27,6 +27,8 @@ fun HomeState.calendars(): List<EntityState> = entities.values
 /**
  * One event from one calendar, in the display's time zone. An all-day event starts at midnight of its first day;
  * [end] is exclusive, as Home Assistant gives it (an all-day event on the 9th ends at midnight starting the 10th).
+ * [uid] identifies the event (every time, for a repeating one) and [recurrenceId] this time of a repeating one; some
+ * calendars give neither.
  */
 data class CalendarEvent(
     val calendarId: String,
@@ -34,11 +36,22 @@ data class CalendarEvent(
     val start: LocalDateTime,
     val end: LocalDateTime,
     val allDay: Boolean,
-)
+    val uid: String? = null,
+    val recurrenceId: String? = null,
+    val description: String? = null,
+    val location: String? = null,
+) {
+    /** The key an assignment to people is saved under for every time this event happens. */
+    val seriesKey: String get() = uid?.let { "uid:$it" } ?: "at:$summary|$start"
+
+    /** The key for just this time; the same as [seriesKey] for an event that doesn't repeat. */
+    val instanceKey: String get() = if (uid != null && recurrenceId != null) "$seriesKey#$recurrenceId" else seriesKey
+}
 
 /**
- * An event as the dashboard shows it, with whose it is: a person's entity ID or [FAMILY]. The same event in several
- * calendars (an invitation, say) is one event with each calendar's owner.
+ * An event as the dashboard shows it, with whose it is: people's entity IDs, or [FAMILY]. The same event in several
+ * calendars (an invitation, say) is one event, from each of [calendarIds]. [owners] are the people it's been
+ * assigned to on this display ([assigned]), or else its calendars' owners.
  */
 data class ShownEvent(
     val summary: String,
@@ -46,33 +59,53 @@ data class ShownEvent(
     val end: LocalDateTime,
     val allDay: Boolean,
     val owners: List<String>,
-)
+    val calendarIds: List<String> = emptyList(),
+    val seriesKey: String = "at:$summary|$start",
+    val instanceKey: String = seriesKey,
+    val description: String? = null,
+    val location: String? = null,
+    val assigned: Assignment = Assignment.None,
+) {
+    /** One time of a repeating event, so it can be assigned this time or every time. */
+    val repeats: Boolean get() = instanceKey != seriesKey
+}
+
+/** Whether an event's people were chosen on this display, and for which times. */
+enum class Assignment { None, ThisTime, EveryTime }
 
 /** A day and its events. */
 data class AgendaDay(val date: LocalDate, val events: List<ShownEvent>)
 
 /**
- * Reads the events from a `calendar.get_events` result, which has a list per calendar. Each `start` and `end` is
- * either a date (all day) or an ISO timestamp; events that can't be read are skipped.
+ * Reads [calendarId]'s events from Home Assistant's calendar REST API (`/api/calendars/<id>`), a list where each
+ * `start` and `end` has either a `date` (all day) or a `dateTime`. Events that can't be read are skipped.
  */
-fun parseCalendarEvents(result: JsonElement, zone: ZoneId = ZoneId.systemDefault()): List<CalendarEvent> {
-    val response = (result as? JsonObject)?.get("response") as? JsonObject ?: return emptyList()
-    return response.flatMap { (calendarId, value) ->
-        val events = (value as? JsonObject)?.get("events") as? JsonArray ?: return@flatMap emptyList()
-        events.mapNotNull { item ->
-            val event = item as? JsonObject ?: return@mapNotNull null
-            val start = event.text("start")?.let { readTime(it, zone) } ?: return@mapNotNull null
-            val end = event.text("end")?.let { readTime(it, zone) } ?: start
-            CalendarEvent(
-                calendarId = calendarId,
-                summary = event.text("summary")?.trim().orEmpty(),
-                start = start.first,
-                end = maxOf(end.first, start.first),
-                allDay = start.second,
-            )
-        }
+fun parseCalendarApiEvents(
+    calendarId: String,
+    result: JsonElement,
+    zone: ZoneId = ZoneId.systemDefault(),
+): List<CalendarEvent> {
+    val events = result as? JsonArray ?: return emptyList()
+    return events.mapNotNull { item ->
+        val event = item as? JsonObject ?: return@mapNotNull null
+        val start = (event["start"] as? JsonObject)?.let { readApiTime(it, zone) } ?: return@mapNotNull null
+        val end = (event["end"] as? JsonObject)?.let { readApiTime(it, zone) } ?: start
+        CalendarEvent(
+            calendarId = calendarId,
+            summary = event.text("summary")?.trim().orEmpty(),
+            start = start.first,
+            end = maxOf(end.first, start.first),
+            allDay = start.second,
+            uid = event.text("uid")?.takeIf { it.isNotBlank() },
+            recurrenceId = event.text("recurrence_id")?.takeIf { it.isNotBlank() },
+            description = event.text("description")?.trim()?.takeIf { it.isNotEmpty() },
+            location = event.text("location")?.trim()?.takeIf { it.isNotEmpty() },
+        )
     }
 }
+
+private fun readApiTime(time: JsonObject, zone: ZoneId): Pair<LocalDateTime, Boolean>? =
+    (time.text("dateTime") ?: time.text("date"))?.let { readTime(it, zone) }
 
 /** A start or end: the local time, and whether it was a plain date (an all-day event). */
 private fun readTime(text: String, zone: ZoneId): Pair<LocalDateTime, Boolean>? {
@@ -84,12 +117,57 @@ private fun readTime(text: String, zone: ZoneId): Pair<LocalDateTime, Boolean>? 
 
 private fun JsonObject.text(key: String): String? = (get(key) as? JsonPrimitive)?.takeIf { it.isString }?.content
 
-/** Joins the same event from several calendars into one, with the owner of each calendar ([ownerOf]). */
-fun mergeEvents(events: List<CalendarEvent>, ownerOf: (calendarId: String) -> String): List<ShownEvent> =
+/**
+ * Joins the same event from several calendars into one. Its people are the ones it was assigned to on this display
+ * ([assignments], by [CalendarEvent.instanceKey], else [CalendarEvent.seriesKey]), else each calendar's owner
+ * ([ownerOf]). Assigned people no longer in Home Assistant ([people]) are dropped.
+ */
+fun mergeEvents(
+    events: List<CalendarEvent>,
+    ownerOf: (calendarId: String) -> String,
+    assignments: Map<String, List<String>> = emptyMap(),
+    people: Set<String>? = null,
+): List<ShownEvent> =
     events.groupBy { Triple(it.summary, it.start, it.end) }.values.map { same ->
         val first = same.first()
-        ShownEvent(first.summary, first.start, first.end, first.allDay, same.map { ownerOf(it.calendarId) }.distinct())
+        fun chosen(key: String) =
+            assignments[key]?.filter { people == null || it in people }?.takeIf { it.isNotEmpty() }
+        val thisTime = chosen(first.instanceKey).takeIf { first.instanceKey != first.seriesKey }
+        val everyTime = chosen(first.seriesKey)
+        ShownEvent(
+            summary = first.summary,
+            start = first.start,
+            end = first.end,
+            allDay = first.allDay,
+            owners = thisTime ?: everyTime ?: same.map { ownerOf(it.calendarId) }.distinct(),
+            calendarIds = same.map { it.calendarId }.distinct(),
+            seriesKey = first.seriesKey,
+            instanceKey = first.instanceKey,
+            description = same.firstNotNullOfOrNull { it.description },
+            location = same.firstNotNullOfOrNull { it.location },
+            assigned = when {
+                thisTime != null -> Assignment.ThisTime
+                everyTime != null -> Assignment.EveryTime
+                else -> Assignment.None
+            },
+        )
     }
+
+/**
+ * [assignments] with [event] given to [people]: this time only, or [everyTime] it happens. No people goes back to
+ * its calendar's owner (for this time, or every time).
+ */
+fun assign(
+    assignments: Map<String, List<String>>,
+    event: ShownEvent,
+    people: List<String>,
+    everyTime: Boolean,
+): Map<String, List<String>> {
+    // Choosing for every time also clears a choice made for just this time, so the new one shows.
+    val key = if (everyTime) event.seriesKey else event.instanceKey
+    val cleared = if (everyTime) assignments - event.instanceKey else assignments
+    return if (people.isEmpty()) cleared - key else cleared + (key to people.distinct())
+}
 
 /** The events of the [selected] owners; all of them when nobody is selected. */
 fun List<ShownEvent>.forOwners(selected: Set<String>): List<ShownEvent> =

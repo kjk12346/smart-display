@@ -8,14 +8,15 @@ import dev.smartdisplay.app.SmartDisplayApp
 import java.io.IOException
 import java.time.LocalDate
 import java.time.ZonedDateTime
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -25,6 +26,7 @@ enum class RunState { Running, Done, Failed }
 /** Runs the kitchen dashboard's buttons (scenes, scripts, automations, Home and Away) and keeps its calendar. */
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
     private val home = (application as SmartDisplayApp).home
+    private val kiosk = (application as SmartDisplayApp).kiosk
 
     private val _runs = MutableStateFlow<Map<String, RunState>>(emptyMap())
 
@@ -70,22 +72,34 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val today = LocalDate.now(now.zone)
         val start = today.atStartOfDay(now.zone)
         val end = today.plusDays(CALENDAR_DAYS.toLong()).atStartOfDay(now.zone)
-        val result = home.callService(
-            domain = "calendar",
-            service = "get_events",
-            data = buildJsonObject {
-                put("start_date_time", start.toOffsetDateTime().toString())
-                put("end_date_time", end.toOffsetDateTime().toString())
-            },
-            target = buildJsonObject { put("entity_id", JsonArray(calendarIds.map(::JsonPrimitive))) },
-            returnResponse = true,
-        )
-        _events.value = calendarIds to parseCalendarEvents(result)
+        // Through the REST API, one request per calendar, for the events' IDs (see calendarEvents).
+        val events = coroutineScope {
+            calendarIds.map { id ->
+                async {
+                    val result = home.calendarEvents(
+                        id,
+                        start.toOffsetDateTime().toString(),
+                        end.toOffsetDateTime().toString(),
+                    )
+                    parseCalendarApiEvents(id, result)
+                }
+            }.awaitAll().flatten()
+        }
+        _events.value = calendarIds to events
         true
     } catch (e: IOException) {
         // Includes not being connected; the last events stay on screen.
         Log.w(TAG, "Calendar events failed", e)
         false
+    }
+
+    /**
+     * Gives [event] to [people] on this display, this time only or [everyTime] it happens; no people goes back to
+     * its calendar's owner.
+     */
+    fun assign(event: ShownEvent, people: List<String>, everyTime: Boolean) {
+        val kitchen = kiosk.config.value.kitchen
+        kiosk.setKitchen(kitchen.copy(eventPeople = assign(kitchen.eventPeople, event, people, everyTime)))
     }
 
     fun run(entityId: String) {

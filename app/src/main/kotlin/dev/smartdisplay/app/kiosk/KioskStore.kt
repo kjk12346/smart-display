@@ -72,6 +72,7 @@ class KioskStore(context: Context) {
         putStringSet(KEY_KITCHEN_HIDDEN_CALENDARS, kitchen.hiddenCalendars)
         putString(KEY_KITCHEN_CALENDAR_OWNERS, encodeMap(kitchen.calendarOwners))
         putString(KEY_KITCHEN_PERSON_COLORS, encodeMap(kitchen.personColors.mapValues { it.value.name }))
+        putString(KEY_KITCHEN_EVENT_PEOPLE, encodeListMap(kitchen.eventPeople))
     }
 
     fun setPin(pin: String) {
@@ -135,6 +136,7 @@ class KioskStore(context: Context) {
             personColors = decodeMap(prefs.getString(KEY_KITCHEN_PERSON_COLORS, null)).mapNotNull { (person, name) ->
                 PersonColor.entries.firstOrNull { it.name == name }?.let { person to it }
             }.toMap(),
+            eventPeople = decodeListMap(prefs.getString(KEY_KITCHEN_EVENT_PEOPLE, null)),
         ),
     )
 
@@ -158,6 +160,7 @@ class KioskStore(context: Context) {
         const val KEY_KITCHEN_HIDDEN_CALENDARS = "kitchen_hidden_calendars"
         const val KEY_KITCHEN_CALENDAR_OWNERS = "kitchen_calendar_owners"
         const val KEY_KITCHEN_PERSON_COLORS = "kitchen_person_colors"
+        const val KEY_KITCHEN_EVENT_PEOPLE = "kitchen_event_people"
     }
 }
 
@@ -167,6 +170,18 @@ internal fun encodeIds(ids: List<String>): String = JsonArray(ids.map(::JsonPrim
 internal fun decodeIds(text: String?): List<String> {
     val array = text?.let { runCatching { Json.parseToJsonElement(it) }.getOrNull() } as? JsonArray ?: return emptyList()
     return array.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }.distinct()
+}
+
+/** A map of string lists, stored as a JSON object of arrays. */
+internal fun encodeListMap(map: Map<String, List<String>>): String =
+    JsonObject(map.mapValues { (_, list) -> JsonArray(list.map(::JsonPrimitive)) }).toString()
+
+internal fun decodeListMap(text: String?): Map<String, List<String>> {
+    val obj = text?.let { runCatching { Json.parseToJsonElement(it) }.getOrNull() } as? JsonObject ?: return emptyMap()
+    return obj.mapNotNull { (key, value) ->
+        val list = (value as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
+        list?.distinct()?.takeIf { it.isNotEmpty() }?.let { key to it }
+    }.toMap()
 }
 
 /** A map of strings, stored as a JSON object. */

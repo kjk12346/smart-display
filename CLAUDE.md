@@ -74,6 +74,12 @@ Home Assistant.
   or not shown; each person has a color (`PersonColor`, handed out in entity ID order unless chosen; `FamilyColor` is
   neutral), also used for their avatar in Who's home. Filter chips show one or more people's events. The same event
   in several calendars shows once, with each owner's color.
+- **Events given to people (added 2026-10-09):** tapping an event opens its details (`EventDialog`) with the
+  household's people as chips; the ticked people then own it on this display, overriding its calendar's owner. Saved
+  only on the display (`KitchenConfig.eventPeople`, decided by the owner), never written to Google. Keyed by the
+  event's `uid` (every time) or `uid#recurrence_id` (just this time of a repeating one); events without a uid fall
+  back to title + start. That's why events come from the REST API (`GET /api/calendars/<id>`,
+  `HomeAssistantClient.calendarEvents`): `calendar.get_events` leaves out the uid. Old assignments aren't pruned.
 - Layout: wide screens give the calendar most of the width (a column per day, as many as fit at 100 dp up to 7; a list
   if under 3) with Who's home, Buttons and the photo (only if the column is tall enough) beside it. Narrow screens
   stack calendar first and scroll; cards must not scroll by themselves there (nested vertical scrolling crashes).

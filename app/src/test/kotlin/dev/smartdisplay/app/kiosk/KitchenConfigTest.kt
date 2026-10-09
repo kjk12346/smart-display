@@ -47,4 +47,12 @@ class KitchenConfigTest {
         val colors = personColors(people, emptyMap())
         assertEquals(PersonColor.entries.first(), colors.getValue(people.last()))
     }
+
+    @Test
+    fun `events given to people survive saving`() {
+        val assignments = mapOf("uid:f" to listOf("person.sam", "person.alex"), "uid:g#1" to listOf("person.sam"))
+        assertEquals(assignments, decodeListMap(encodeListMap(assignments)))
+        assertEquals(emptyMap<String, List<String>>(), decodeListMap("[]"))
+        assertEquals(mapOf("a" to listOf("x")), decodeListMap("""{"a": ["x", 3, "x"], "b": [], "c": "y"}"""))
+    }
 }
