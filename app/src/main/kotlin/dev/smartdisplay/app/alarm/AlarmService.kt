@@ -23,7 +23,6 @@ import dev.smartdisplay.app.SmartDisplayApp
 import dev.smartdisplay.app.ha.ConnectionStatus
 import dev.smartdisplay.app.ha.HomeState
 import java.io.IOException
-import kotlin.math.pow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -131,6 +130,8 @@ class AlarmService : Service() {
         val sent = mutableMapOf<String, SunriseLevel>()
         while (true) {
             val now = System.currentTimeMillis()
+            // Ring time: the alarm takes over (and by now it may already count as rung, so check this first).
+            if (now >= sunrise.ringMillis - RING_MARGIN_MS) break
             val next = app.alarms.next()
             if (next == null || next.alarm.id != sunrise.alarmId ||
                 next.at.toInstant().toEpochMilli() != sunrise.ringMillis
@@ -140,7 +141,6 @@ class AlarmService : Service() {
                 endSunrise()
                 return@coroutineScope
             }
-            if (now >= sunrise.ringMillis) break
             val home = app.home.state.value
             if (home.status == ConnectionStatus.Connected) {
                 val level = sunriseLevel(sunrise.progress(now))
@@ -164,6 +164,9 @@ class AlarmService : Service() {
             }
             delay(minOf(STEP_MS, sunrise.ringMillis - now))
         }
+        // The ring normally ends the sunrise; if it never comes (the alarm went at the last moment), stop anyway.
+        delay(RING_GRACE_MS)
+        if (_sunrise.value == sunrise) endSunrise()
     }
 
     /** "I'm up" during a sunrise: the lights come up to full, and this morning's ring is skipped. */
@@ -218,7 +221,7 @@ class AlarmService : Service() {
         acquireWakeLock(RING_LIMIT_MS + STOP_TIMEOUT_MS)
 
         val actions = app.alarms.actions.value
-        if (actions.sound) startSound(crescendo = actions.sunriseMinutes > 0)
+        if (actions.sound) startSound()
         if (actions.usesHomeAssistant) ringJobs += scope.launch { homeAssistantActions(actions) }
         ringJobs += scope.launch {
             delay(RING_LIMIT_MS)
@@ -307,8 +310,7 @@ class AlarmService : Service() {
         stopSelf()
     }
 
-    /** Plays the alarm sound; with [crescendo], it starts quiet and grows to full volume over [CRESCENDO_MS]. */
-    private fun startSound(crescendo: Boolean) {
+    private fun startSound() {
         val uri = RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
@@ -323,26 +325,12 @@ class AlarmService : Service() {
                 setDataSource(this@AlarmService, uri)
                 isLooping = true
                 prepare()
-                if (crescendo) setVolume(CRESCENDO_FLOOR, CRESCENDO_FLOOR)
                 start()
             }
-            if (crescendo) ringJobs += scope.launch { growVolume() }
         } catch (e: Exception) {
             // Some tablets (Fire) have no alarm sounds installed; the screen still shows.
             Log.w(TAG, "Couldn't play the alarm sound", e)
             stopSound()
-        }
-    }
-
-    private suspend fun growVolume() {
-        val start = System.currentTimeMillis()
-        while (true) {
-            val t = ((System.currentTimeMillis() - start).toFloat() / CRESCENDO_MS).coerceAtMost(1f)
-            // Loudness is heard on a log scale: rising evenly in decibels sounds like a steady rise.
-            val volume = CRESCENDO_FLOOR * (1f / CRESCENDO_FLOOR).pow(t)
-            player?.setVolume(volume, volume) ?: return
-            if (t >= 1f) return
-            delay(CRESCENDO_STEP_MS)
         }
     }
 
@@ -439,10 +427,9 @@ class AlarmService : Service() {
         /** How often the sunrise brightens the lights (each step glides, on lights that can). */
         private const val STEP_MS = 30_000L
 
-        /** After a sunrise, the alarm sound starts at this volume and grows to full over [CRESCENDO_MS]. */
-        private const val CRESCENDO_FLOOR = 0.05f
-        private const val CRESCENDO_MS = 60_000L
-        private const val CRESCENDO_STEP_MS = 500L
+        /** The sunrise hands over to the ring this close to it, and gives up if no ring comes within the grace. */
+        private const val RING_MARGIN_MS = 2_000L
+        private const val RING_GRACE_MS = 60_000L
 
         private val _ringing = MutableStateFlow<Alarm?>(null)
 

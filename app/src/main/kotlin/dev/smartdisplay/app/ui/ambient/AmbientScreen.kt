@@ -206,21 +206,29 @@ private fun AmbientContent(
                 .offset { IntOffset(offsetX.roundToPx(), offsetY.roundToPx()) }
                 .graphicsLayer { alpha = contentAlpha },
         ) {
-            if (landscape) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(clock * 0.6f),
-                ) {
-                    Clock(now, nextAlarm, clock, Alignment.Start)
-                    if (weather != null) Weather(weather, forecast, night, clock)
-                }
-            } else {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(clock * 0.45f),
-                ) {
-                    Clock(now, nextAlarm, clock, Alignment.CenterHorizontally)
-                    if (weather != null) Weather(weather, forecast, night, clock)
+            // On the bright sunrise glow, the softer greys and lavender would fade into it: use the main text colour.
+            val colors = MaterialTheme.colorScheme
+            val readable = if (sunrise == null) colors else colors.copy(
+                onSurfaceVariant = colors.onBackground.copy(alpha = 0.9f),
+                tertiary = colors.onBackground,
+            )
+            MaterialTheme(colorScheme = readable, typography = MaterialTheme.typography, shapes = MaterialTheme.shapes) {
+                if (landscape) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(clock * 0.6f),
+                    ) {
+                        Clock(now, nextAlarm, clock, Alignment.Start)
+                        if (weather != null) Weather(weather, forecast, night, clock)
+                    }
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(clock * 0.45f),
+                    ) {
+                        Clock(now, nextAlarm, clock, Alignment.CenterHorizontally)
+                        if (weather != null) Weather(weather, forecast, night, clock)
+                    }
                 }
             }
         }
