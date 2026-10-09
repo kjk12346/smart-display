@@ -168,7 +168,7 @@ Home Assistant.
 - JDK 17 (`JAVA_HOME`), Android SDK via `local.properties` (not committed). No Android Studio assumed: build from the
   command line (`gradlew.bat assembleDebug`) and install with `adb install -r`.
 - **Android Gradle plugin 9.4.1**, **Gradle 9.7.1**. AGP 9 has built-in Kotlin support, but bundles Kotlin Gradle
-  plugin 2.2.10; the root `build.gradle.kts` pins the catalog's Kotlin version (2.4.20) with `kotlin.android`
+  plugin 2.2.10; the root `build.gradle.kts` pins the catalog's Kotlin version (2.4.21) with `kotlin.android`
   `apply false`. Keep `kotlin` and the Compose compiler plugin on the same version.
 - Current AndroidX releases need compileSdk 37, so the app compiles against 37.2 and targets 36. `sdkmanager` is now
   a shim; install SDK packages with `cmdline-tools/latest/bin/android.exe --sdk=<sdk dir> sdk install
