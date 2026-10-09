@@ -62,6 +62,24 @@ Home Assistant.
   Sleep API, ~10 min updates) shows stirring. Health Connect only gives sleep duration after the night, so true
   light-sleep detection isn't available through Home Assistant.
 
+## Family / kitchen display (added 2026-10-09)
+
+- A third display type (Settings > "Who uses this display"). By day a dashboard (`ui/dashboard/`): clock, weather
+  and forecast, the family calendar, who's home with Home and Away buttons, the owner's scene/script buttons, a photo.
+  At night the clock over the photos, dimmed.
+- **Family calendar (Skylight-style):** events from every `calendar.*` entity via `calendar.get_events` (from the
+  start of today, 7 days, refreshed every 5 min; `CalendarModel.kt`, `CalendarCard.kt`). Google Calendar comes in
+  through Home Assistant's own integration (the owner's Google Cloud OAuth client, published so sign-ins don't expire
+  after 7 days), not from the app. In Settings each calendar is a person's (`person.*`), the family's (the default)
+  or not shown; each person has a color (`PersonColor`, handed out in entity ID order unless chosen; `FamilyColor` is
+  neutral), also used for their avatar in Who's home. Filter chips show one or more people's events. The same event
+  in several calendars shows once, with each owner's color.
+- Layout: wide screens give the calendar most of the width (a column per day, as many as fit at 100 dp up to 7; a list
+  if under 3) with Who's home, Buttons and the photo (only if the column is tall enough) beside it. Narrow screens
+  stack calendar first and scroll; cards must not scroll by themselves there (nested vertical scrolling crashes).
+- Checked on the Pixel 6 in portrait and landscape (2026-10-09). Not yet on a tablet, or with calendars assigned to
+  people.
+
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
 `CLAUDE.local.md`, which is not committed. Keep personal details out of committed files and commit messages.
 

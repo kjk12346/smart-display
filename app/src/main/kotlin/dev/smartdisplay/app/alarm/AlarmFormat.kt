@@ -30,7 +30,8 @@ fun nextRingText(context: Context, next: NextRing, now: ZonedDateTime = ZonedDat
     return if (soon) time else format(next.at, "EEE", Locale.getDefault()) + " " + time
 }
 
-private fun timeText(context: Context, time: TemporalAccessor): String {
+/** A time in the device's 12- or 24-hour style ("7:30 AM", "07:30"). */
+internal fun timeText(context: Context, time: TemporalAccessor): String {
     val locale = Locale.getDefault()
     val skeleton = if (DateFormat.is24HourFormat(context)) "Hm" else "hma"
     return format(time, DateFormat.getBestDateTimePattern(locale, skeleton), locale)

@@ -6,19 +6,23 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.smartdisplay.app.SmartDisplayApp
 import java.io.IOException
+import java.time.LocalDate
+import java.time.ZonedDateTime
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /** How a button's run went, shown on it for a moment. */
 enum class RunState { Running, Done, Failed }
 
-/** Runs the kitchen dashboard's buttons (scenes, scripts, automations, Home and Away). */
+/** Runs the kitchen dashboard's buttons (scenes, scripts, automations, Home and Away) and keeps its calendar. */
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
     private val home = (application as SmartDisplayApp).home
 
@@ -26,6 +30,63 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Buttons running now or just finished, by entity ID. */
     val runs: StateFlow<Map<String, RunState>> = _runs.asStateFlow()
+
+    private val _events = MutableStateFlow<Pair<List<String>, List<CalendarEvent>>?>(null)
+
+    /** This week's events (from the start of today), and the calendars they're from. */
+    val events: StateFlow<Pair<List<String>, List<CalendarEvent>>?> = _events.asStateFlow()
+
+    private val _selectedOwners = MutableStateFlow<Set<String>>(emptySet())
+
+    /** Whose events the calendar shows: people's entity IDs and [FAMILY]; empty for everyone's. */
+    val selectedOwners: StateFlow<Set<String>> = _selectedOwners.asStateFlow()
+
+    /** Shows or stops showing [owner]'s events. Selecting every one of [allOwners] goes back to everyone. */
+    fun toggleOwner(owner: String, allOwners: Collection<String>) {
+        _selectedOwners.update { selected ->
+            val next = if (owner in selected) selected - owner else selected + owner
+            if (next.containsAll(allOwners)) emptySet() else next
+        }
+    }
+
+    fun showEveryone() {
+        _selectedOwners.value = emptySet()
+    }
+
+    /**
+     * Fetches this week's events from [calendarIds] now and then every [CALENDAR_REFRESH_MS], until cancelled.
+     * Run it only while connected and on screen.
+     */
+    suspend fun keepCalendarFresh(calendarIds: List<String>) {
+        if (calendarIds.isEmpty()) return
+        while (true) {
+            val fetched = fetchEvents(calendarIds)
+            delay(if (fetched) CALENDAR_REFRESH_MS else RETRY_MS)
+        }
+    }
+
+    private suspend fun fetchEvents(calendarIds: List<String>): Boolean = try {
+        val now = ZonedDateTime.now()
+        val today = LocalDate.now(now.zone)
+        val start = today.atStartOfDay(now.zone)
+        val end = today.plusDays(CALENDAR_DAYS.toLong()).atStartOfDay(now.zone)
+        val result = home.callService(
+            domain = "calendar",
+            service = "get_events",
+            data = buildJsonObject {
+                put("start_date_time", start.toOffsetDateTime().toString())
+                put("end_date_time", end.toOffsetDateTime().toString())
+            },
+            target = buildJsonObject { put("entity_id", JsonArray(calendarIds.map(::JsonPrimitive))) },
+            returnResponse = true,
+        )
+        _events.value = calendarIds to parseCalendarEvents(result)
+        true
+    } catch (e: IOException) {
+        // Includes not being connected; the last events stay on screen.
+        Log.w(TAG, "Calendar events failed", e)
+        false
+    }
 
     fun run(entityId: String) {
         val call = runCall(entityId) ?: return
@@ -54,5 +115,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private companion object {
         const val TAG = "DashboardViewModel"
         const val RESULT_SHOWN_MS = 2_500L
+        const val CALENDAR_REFRESH_MS = 5 * 60_000L
+        const val RETRY_MS = 60_000L
     }
 }

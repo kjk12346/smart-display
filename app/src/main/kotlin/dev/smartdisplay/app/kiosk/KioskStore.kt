@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /** The display's kiosk options, as chosen in Settings. */
@@ -68,6 +69,9 @@ class KioskStore(context: Context) {
         putString(KEY_KITCHEN_SHORTCUTS, encodeIds(kitchen.shortcuts))
         putString(KEY_KITCHEN_HOME, kitchen.homeAction)
         putString(KEY_KITCHEN_AWAY, kitchen.awayAction)
+        putStringSet(KEY_KITCHEN_HIDDEN_CALENDARS, kitchen.hiddenCalendars)
+        putString(KEY_KITCHEN_CALENDAR_OWNERS, encodeMap(kitchen.calendarOwners))
+        putString(KEY_KITCHEN_PERSON_COLORS, encodeMap(kitchen.personColors.mapValues { it.value.name }))
     }
 
     fun setPin(pin: String) {
@@ -126,6 +130,11 @@ class KioskStore(context: Context) {
             shortcuts = decodeIds(prefs.getString(KEY_KITCHEN_SHORTCUTS, null)),
             homeAction = prefs.getString(KEY_KITCHEN_HOME, null),
             awayAction = prefs.getString(KEY_KITCHEN_AWAY, null),
+            hiddenCalendars = prefs.getStringSet(KEY_KITCHEN_HIDDEN_CALENDARS, null)?.toSet().orEmpty(),
+            calendarOwners = decodeMap(prefs.getString(KEY_KITCHEN_CALENDAR_OWNERS, null)),
+            personColors = decodeMap(prefs.getString(KEY_KITCHEN_PERSON_COLORS, null)).mapNotNull { (person, name) ->
+                PersonColor.entries.firstOrNull { it.name == name }?.let { person to it }
+            }.toMap(),
         ),
     )
 
@@ -146,6 +155,9 @@ class KioskStore(context: Context) {
         const val KEY_KITCHEN_SHORTCUTS = "kitchen_shortcuts"
         const val KEY_KITCHEN_HOME = "kitchen_home"
         const val KEY_KITCHEN_AWAY = "kitchen_away"
+        const val KEY_KITCHEN_HIDDEN_CALENDARS = "kitchen_hidden_calendars"
+        const val KEY_KITCHEN_CALENDAR_OWNERS = "kitchen_calendar_owners"
+        const val KEY_KITCHEN_PERSON_COLORS = "kitchen_person_colors"
     }
 }
 
@@ -155,4 +167,14 @@ internal fun encodeIds(ids: List<String>): String = JsonArray(ids.map(::JsonPrim
 internal fun decodeIds(text: String?): List<String> {
     val array = text?.let { runCatching { Json.parseToJsonElement(it) }.getOrNull() } as? JsonArray ?: return emptyList()
     return array.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }.distinct()
+}
+
+/** A map of strings, stored as a JSON object. */
+internal fun encodeMap(map: Map<String, String>): String = JsonObject(map.mapValues { JsonPrimitive(it.value) }).toString()
+
+internal fun decodeMap(text: String?): Map<String, String> {
+    val obj = text?.let { runCatching { Json.parseToJsonElement(it) }.getOrNull() } as? JsonObject ?: return emptyMap()
+    return obj.mapNotNull { (key, value) ->
+        (value as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { key to it }
+    }.toMap()
 }

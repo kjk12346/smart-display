@@ -30,10 +30,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -41,11 +44,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.smartdisplay.app.R
+import dev.smartdisplay.app.ha.ConnectionStatus
 import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.kiosk.KitchenConfig
+import dev.smartdisplay.app.kiosk.personColors
 import dev.smartdisplay.app.kiosk.WallpaperConfig
 import dev.smartdisplay.app.ui.ambient.AmbientViewModel
 import dev.smartdisplay.app.ui.ambient.Clock
@@ -60,13 +68,19 @@ import dev.smartdisplay.app.ui.ambient.rememberNextAlarmText
 import dev.smartdisplay.app.ui.ambient.sunIsDown
 import dev.smartdisplay.app.ui.ambient.toCurrentWeather
 import dev.smartdisplay.app.ui.common.rememberMinuteClock
+import dev.smartdisplay.app.ui.theme.FamilyColor
+import dev.smartdisplay.app.ui.theme.OnPersonColor
+import dev.smartdisplay.app.ui.theme.color
 import java.time.LocalDate
 import java.time.format.TextStyle
 
 /**
- * The kitchen display's daytime screen: the time and weather with a few days' forecast, who's home with Home and
- * Away buttons, the owner's buttons for scenes, scripts and automations, and a photo. Wide screens get columns;
- * narrow ones stack and scroll.
+ * The kitchen display's daytime screen: the time and weather with a few days' forecast, the family calendar, who's
+ * home with Home and Away buttons, the owner's buttons for scenes, scripts and automations, and a photo.
+ *
+ * Wide screens give most of the room to the calendar's week, with the rest in a column beside it; narrow ones stack
+ * everything, calendar first, and scroll. With no calendars shown, the calendar is left out and the rest share the
+ * width. Each person has a color, on their calendar events and their avatar.
  */
 @Composable
 fun DashboardScreen(
@@ -84,6 +98,16 @@ fun DashboardScreen(
     val forecastDays by ambient.forecastDays.collectAsStateWithLifecycle()
     val wallpaper by ambient.wallpaper.collectAsStateWithLifecycle()
     val runs by viewModel.runs.collectAsStateWithLifecycle()
+    val calendarIds = remember(home.entities, home.registry, kitchen.hiddenCalendars) {
+        home.calendars().map { it.entityId }.filterNot { it in kitchen.hiddenCalendars }
+    }
+    val connected = home.status == ConnectionStatus.Connected
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(connected, calendarIds) {
+        if (connected) lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepCalendarFresh(calendarIds) }
+    }
+    val events by viewModel.events.collectAsStateWithLifecycle()
+    val selectedOwners by viewModel.selectedOwners.collectAsStateWithLifecycle()
     val now by rememberMinuteClock()
     val nextAlarm = rememberNextAlarmText(now)
 
@@ -92,53 +116,104 @@ fun DashboardScreen(
         .take(FORECAST_DAYS)
     val photoUrl = wallpaper?.takeIf { it.folderId == wallpaperConfig.folderId }?.url
     val names = home.entities
+    val people = home.people()
+    val colors = remember(people.map { it.entityId }.toSet(), kitchen.personColors) {
+        personColors(people.map { it.entityId }, kitchen.personColors)
+    }
+    val personColor = { personId: String -> colors[personId]?.color() }
+    fun ownerOf(calendarId: String) = calendarOwner(calendarId, kitchen.calendarOwners, colors.keys)
+    // People with a calendar shown, by name, then the family if any calendar is everyone's.
+    val owners = calendarIds.map(::ownerOf).toSet().let { ids ->
+        people.filter { it.entityId in ids }.sortedBy { it.name.lowercase() }.map { person ->
+            CalendarOwner(person.entityId, person.name.substringBefore(' '), personColor(person.entityId)!!)
+        } + listOfNotNull(
+            CalendarOwner(FAMILY, stringResource(R.string.calendar_family), FamilyColor).takeIf { FAMILY in ids },
+        )
+    }
+    // A choice of someone who no longer has a calendar shown is dropped.
+    val selected = selectedOwners.filterTo(mutableSetOf()) { id -> owners.any { it.id == id } }
 
-    val header: @Composable () -> Unit = {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Clock(now, nextAlarm, size = 56.dp, alignment = Alignment.Start)
-            Spacer(Modifier.weight(1f))
-            val weather = weatherEntity?.toCurrentWeather()
-            if (weather != null) {
-                val night = home.sunIsDown() ?: false
-                WeatherIcon(weather.condition, night, size = 48.dp)
-                Column(modifier = Modifier.padding(start = 12.dp, end = 24.dp)) {
-                    Text(
-                        weather.temperature?.let(::formatTemperature) ?: "–",
-                        fontSize = 36.sp,
-                        fontWeight = FontWeight.Light,
-                    )
-                    Text(
-                        conditionLabel(weather.condition, night),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            ForecastStrip(days, today = now.toLocalDate())
-            Spacer(Modifier.weight(1f))
-            Column(horizontalAlignment = Alignment.End) {
-                TextButton(onClick = onOpenControls) { Text(stringResource(R.string.dashboard_rooms)) }
-                TextButton(onClick = onOpenAlarms) { Text(stringResource(R.string.alarms_button)) }
-                TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_eyebrow)) }
+    val currentWeather: @Composable () -> Unit = {
+        val weather = weatherEntity?.toCurrentWeather()
+        if (weather != null) {
+            val night = home.sunIsDown() ?: false
+            WeatherIcon(weather.condition, night, size = 48.dp)
+            Column(modifier = Modifier.padding(start = 12.dp, end = 24.dp)) {
+                Text(
+                    weather.temperature?.let(::formatTemperature) ?: "–",
+                    fontSize = 36.sp,
+                    fontWeight = FontWeight.Light,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Text(
+                    conditionLabel(weather.condition, night),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
-    val peopleCard: @Composable (Modifier) -> Unit = { modifier ->
+    val navButtons: @Composable () -> Unit = {
+        TextButton(onClick = onOpenControls) { Text(stringResource(R.string.dashboard_rooms)) }
+        TextButton(onClick = onOpenAlarms) { Text(stringResource(R.string.alarms_button)) }
+        TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_eyebrow)) }
+    }
+    // Wide: one row. Narrow: the clock and weather, then the forecast, then the buttons, each on its own line.
+    val header: @Composable (wide: Boolean) -> Unit = { wide ->
+        if (wide) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Clock(now, nextAlarm, size = 56.dp, alignment = Alignment.Start)
+                Spacer(Modifier.weight(1f))
+                currentWeather()
+                ForecastStrip(days, today = now.toLocalDate())
+                Spacer(Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.End) { navButtons() }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Clock(now, nextAlarm, size = 56.dp, alignment = Alignment.Start)
+                    Spacer(Modifier.weight(1f))
+                    currentWeather()
+                }
+                ForecastStrip(days, today = now.toLocalDate())
+                Row { navButtons() }
+            }
+        }
+    }
+    val peopleCard: @Composable (Modifier, Boolean) -> Unit = { modifier, scroll ->
         PeopleCard(
-            people = home.people(),
+            people = people,
+            colorOf = personColor,
             kitchen = kitchen,
             runs = runs,
             onRun = viewModel::run,
             modifier = modifier,
+            scroll = scroll,
         )
     }
-    val buttonsCard: @Composable (Modifier) -> Unit = { modifier ->
+    val showCalendar = calendarIds.isNotEmpty()
+    val calendarCard: @Composable (Modifier, Boolean) -> Unit = { modifier, bounded ->
+        CalendarCard(
+            // Null until the first fetch for these calendars, so the card starts empty, not "nothing coming up".
+            events = events?.takeIf { it.first == calendarIds }?.second?.let { mergeEvents(it, ::ownerOf) },
+            owners = owners,
+            selected = selected,
+            onToggle = { viewModel.toggleOwner(it, owners.map { owner -> owner.id }) },
+            onEveryone = viewModel::showEveryone,
+            now = now,
+            bounded = bounded,
+            modifier = modifier,
+        )
+    }
+    val buttonsCard: @Composable (Modifier, Boolean) -> Unit = { modifier, scroll ->
         ButtonsCard(
             shortcuts = kitchen.shortcuts.filter { it in names },
             nameOf = { names[it]?.friendlyName ?: it },
             runs = runs,
             onRun = viewModel::run,
             modifier = modifier,
+            scroll = scroll,
         )
     }
 
@@ -151,11 +226,24 @@ fun DashboardScreen(
     ) {
         if (maxWidth > maxHeight && maxWidth >= 720.dp) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                header()
+                header(true)
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.weight(1f)) {
-                    peopleCard(Modifier.weight(1f).fillMaxHeight())
-                    buttonsCard(Modifier.weight(1.3f).fillMaxHeight())
-                    PhotoTile(photoUrl, wallpaperConfig, Modifier.weight(1.2f).fillMaxHeight())
+                    if (showCalendar) {
+                        calendarCard(Modifier.weight(2.6f).fillMaxHeight(), true)
+                        // The photo only where the column is tall enough for it to be more than a strip.
+                        BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
+                            val photo = maxHeight >= 520.dp
+                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                peopleCard(Modifier.weight(1f).fillMaxWidth(), true)
+                                buttonsCard(Modifier.weight(1f).fillMaxWidth(), true)
+                                if (photo) PhotoTile(photoUrl, wallpaperConfig, Modifier.weight(1.2f).fillMaxWidth())
+                            }
+                        }
+                    } else {
+                        peopleCard(Modifier.weight(1f).fillMaxHeight(), true)
+                        buttonsCard(Modifier.weight(1.3f).fillMaxHeight(), true)
+                        PhotoTile(photoUrl, wallpaperConfig, Modifier.weight(1.2f).fillMaxHeight())
+                    }
                 }
             }
         } else {
@@ -163,9 +251,10 @@ fun DashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
-                header()
-                peopleCard(Modifier.fillMaxWidth())
-                buttonsCard(Modifier.fillMaxWidth())
+                header(false)
+                if (showCalendar) calendarCard(Modifier.fillMaxWidth(), false)
+                peopleCard(Modifier.fillMaxWidth(), false)
+                buttonsCard(Modifier.fillMaxWidth(), false)
                 PhotoTile(photoUrl, wallpaperConfig, Modifier.fillMaxWidth().aspectRatio(4f / 3f))
             }
         }
@@ -195,14 +284,24 @@ private fun ForecastStrip(days: List<ForecastDay>, today: LocalDate) {
                 Text(
                     listOfNotNull(day.high, day.low).joinToString(" ") { formatTemperature(it) },
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
             }
         }
     }
 }
 
+/**
+ * A titled card. In a column of fixed height it [scroll]s by itself; stacked in a page that scrolls, it mustn't
+ * (Compose doesn't allow a scrolling view inside another scrolling the same way).
+ */
 @Composable
-private fun DashCard(title: String, modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
+private fun DashCard(
+    title: String,
+    modifier: Modifier,
+    scroll: Boolean,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(24.dp),
@@ -210,7 +309,7 @@ private fun DashCard(title: String, modifier: Modifier, content: @Composable Col
     ) {
         Column(
             modifier = Modifier
-                .verticalScroll(rememberScrollState())
+                .then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier)
                 .padding(20.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
@@ -223,12 +322,14 @@ private fun DashCard(title: String, modifier: Modifier, content: @Composable Col
 @Composable
 private fun PeopleCard(
     people: List<Person>,
+    colorOf: (personId: String) -> Color?,
     kitchen: KitchenConfig,
     runs: Map<String, RunState>,
     onRun: (String) -> Unit,
     modifier: Modifier,
+    scroll: Boolean,
 ) {
-    DashCard(stringResource(R.string.dashboard_people), modifier) {
+    DashCard(stringResource(R.string.dashboard_people), modifier, scroll) {
         if (people.isEmpty()) {
             Text(
                 stringResource(R.string.dashboard_no_people),
@@ -246,7 +347,7 @@ private fun PeopleCard(
                         .clip(CircleShape)
                         .background(
                             if (home) {
-                                MaterialTheme.colorScheme.primary
+                                colorOf(person.entityId) ?: MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.surfaceContainerHighest
                             }
@@ -255,7 +356,7 @@ private fun PeopleCard(
                     Text(
                         person.initials,
                         style = MaterialTheme.typography.titleMedium,
-                        color = if (home) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        color = if (home) OnPersonColor else MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 Column(modifier = Modifier.padding(start = 12.dp)) {
@@ -301,8 +402,9 @@ private fun ButtonsCard(
     runs: Map<String, RunState>,
     onRun: (String) -> Unit,
     modifier: Modifier,
+    scroll: Boolean,
 ) {
-    DashCard(stringResource(R.string.dashboard_buttons), modifier) {
+    DashCard(stringResource(R.string.dashboard_buttons), modifier, scroll) {
         if (shortcuts.isEmpty()) {
             Text(
                 stringResource(R.string.dashboard_no_buttons),
