@@ -1,14 +1,18 @@
 package dev.smartdisplay.app.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -28,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.smartdisplay.app.R
 import dev.smartdisplay.app.SmartDisplayApp
+import dev.smartdisplay.app.alarm.SUNRISE_CHOICES
 import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.ha.MediaFolder
 import dev.smartdisplay.app.ui.common.PanelBody
@@ -67,6 +72,31 @@ fun AlarmSettings(home: HomeState, browse: suspend (String) -> MediaFolder) {
     )
     OutlinedButton(onClick = { choosing = Choosing.Lights }, modifier = Modifier.padding(top = 8.dp)) {
         Text(stringResource(R.string.alarm_lights_choose))
+    }
+
+    Heading(stringResource(R.string.sunrise_setting))
+    PanelBody(stringResource(R.string.sunrise_setting_body), topPadding = 2.dp)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .horizontalScroll(rememberScrollState()),
+    ) {
+        SUNRISE_CHOICES.forEach { minutes ->
+            FilterChip(
+                selected = actions.sunriseMinutes == minutes,
+                onClick = { alarms.setActions(actions.copy(sunriseMinutes = minutes)) },
+                label = {
+                    Text(
+                        if (minutes == 0) {
+                            stringResource(R.string.sunrise_off)
+                        } else {
+                            stringResource(R.string.settings_dim_minutes, minutes)
+                        }
+                    )
+                },
+            )
+        }
     }
 
     Heading(stringResource(R.string.alarm_speaker))

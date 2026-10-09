@@ -30,6 +30,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import dev.smartdisplay.app.alarm.AlarmService
 import dev.smartdisplay.app.auth.REDIRECT_URI
 import dev.smartdisplay.app.auth.SessionState
 import dev.smartdisplay.app.kiosk.HomeApp
@@ -67,7 +68,8 @@ class MainActivity : ComponentActivity() {
     private var dimAfterMillis = 0L
     private var dimmed = false
     private var swallowingTouch = false
-    private val dimRunnable = Runnable { setDimmed(true) }
+    // Not during a sunrise: the screen is meant to be glowing brighter then.
+    private val dimRunnable = Runnable { if (AlarmService.sunrise.value == null) setDimmed(true) else scheduleDim() }
 
     // The power button in a kiosk: see onScreenOff.
     private val screenOffs = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -105,6 +107,9 @@ class MainActivity : ComponentActivity() {
         )
         watchingScreen = true
 
+        lifecycleScope.launch {
+            AlarmService.sunrise.collect { if (it != null) setDimmed(false) }
+        }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 app.kiosk.config.map { it.dimAfterMinutes }.distinctUntilChanged().collect { minutes ->

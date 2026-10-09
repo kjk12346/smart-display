@@ -1,6 +1,7 @@
 package dev.smartdisplay.app.alarm
 
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalTime
 import java.time.ZonedDateTime
 import java.time.format.TextStyle
@@ -23,6 +24,9 @@ data class Alarm(
 /** A snoozed alarm, ringing again at [atMillis]. */
 data class Snooze(val alarmId: Int, val atMillis: Long)
 
+/** One ring of an alarm, at [atMillis], that won't happen: someone was up before it ("I'm up" during a sunrise). */
+data class Skip(val alarmId: Int, val atMillis: Long)
+
 /**
  * When [this] alarm next rings strictly after [after], in [after]'s time zone, or null if it's off. A time skipped
  * by a daylight-saving change rings at the first moment after the gap, as clocks do.
@@ -41,12 +45,16 @@ fun Alarm.nextTrigger(after: ZonedDateTime): ZonedDateTime? {
 /** What rings next, if anything: an alarm at a time, possibly a snooze. */
 data class NextRing(val alarm: Alarm, val at: ZonedDateTime, val snoozed: Boolean)
 
-/** The soonest of [alarms] (and [snooze]) after [now]. */
-fun nextRing(alarms: List<Alarm>, snooze: Snooze?, now: ZonedDateTime): NextRing? {
-    val scheduled = alarms.mapNotNull { alarm -> alarm.nextTrigger(now)?.let { NextRing(alarm, it, snoozed = false) } }
+/** The soonest of [alarms] (and [snooze]) after [now], leaving out a [skip]ped ring. */
+fun nextRing(alarms: List<Alarm>, snooze: Snooze?, now: ZonedDateTime, skip: Skip? = null): NextRing? {
+    val scheduled = alarms.mapNotNull { alarm ->
+        val skipped = skip?.takeIf { it.alarmId == alarm.id && it.atMillis >= now.toInstant().toEpochMilli() }
+        val after = skipped?.let { ZonedDateTime.ofInstant(Instant.ofEpochMilli(it.atMillis), now.zone) } ?: now
+        alarm.nextTrigger(after)?.let { NextRing(alarm, it, snoozed = false) }
+    }
     val snoozed = snooze?.let { s ->
         val alarm = alarms.firstOrNull { it.id == s.alarmId } ?: return@let null
-        val at = ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(s.atMillis), now.zone)
+        val at = ZonedDateTime.ofInstant(Instant.ofEpochMilli(s.atMillis), now.zone)
         if (at.isAfter(now)) NextRing(alarm, at, snoozed = true) else null
     }
     return (scheduled + listOfNotNull(snoozed)).minByOrNull { it.at.toInstant() }

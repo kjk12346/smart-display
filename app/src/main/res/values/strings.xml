@@ -164,6 +164,14 @@
     <string name="alarm_speaker_off">Turn off</string>
     <string name="alarm_clear_all">Clear all alarms</string>
     <string name="alarm_clear_all_body">For between guests: removes every alarm on this display.</string>
+    <string name="sunrise_setting">Sunrise before the alarm</string>
+    <string name="sunrise_setting_body">The chosen lights slowly brighten from a warm glow to daylight, and the screen glows, so the alarm finds you already waking. Then its sound starts quietly and grows.</string>
+    <string name="sunrise_off">Off</string>
+    <string name="sunrise_channel">Sunrise</string>
+    <string name="sunrise_title">Sunrise</string>
+    <string name="sunrise_text">Alarm at %1$s</string>
+    <string name="sunrise_ambient">Sunrise · alarm at %1$s</string>
+    <string name="sunrise_im_up">I\'m up</string>
     <string name="alarm_channel">Alarms</string>
     <string name="alarm_default_label">Alarm</string>
     <string name="alarm_snooze">Snooze</string>

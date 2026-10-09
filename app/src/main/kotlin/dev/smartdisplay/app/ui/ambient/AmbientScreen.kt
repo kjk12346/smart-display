@@ -21,17 +21,22 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -53,6 +58,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import dev.smartdisplay.app.R
 import dev.smartdisplay.app.SmartDisplayApp
+import dev.smartdisplay.app.alarm.AlarmService
 import dev.smartdisplay.app.alarm.nextRing
 import dev.smartdisplay.app.alarm.nextRingText
 import dev.smartdisplay.app.ha.ConnectionStatus
@@ -66,6 +72,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 /** Screen brightness during quiet hours (0 to 1). */
 private const val NIGHT_BRIGHTNESS = 0.08f
@@ -100,7 +107,25 @@ fun AmbientScreen(
 
     val now by rememberMinuteClock()
     val quiet = isQuietHours(now.toLocalTime())
-    ScreenBrightness(if (quiet) NIGHT_BRIGHTNESS else null)
+
+    // Before an alarm with a sunrise, the screen glows brighter and warmer (over the night dimming) until it rings.
+    val sunrise by AlarmService.sunrise.collectAsStateWithLifecycle()
+    val sunriseProgress by produceState<Float?>(null, sunrise) {
+        val current = sunrise
+        while (current != null) {
+            value = current.progress(System.currentTimeMillis())
+            delay(SUNRISE_TICK_MS)
+        }
+        value = null
+    }
+    val glow = sunriseProgress
+    ScreenBrightness(
+        when {
+            glow != null -> NIGHT_BRIGHTNESS + (1f - NIGHT_BRIGHTNESS) * glow * glow
+            quiet -> NIGHT_BRIGHTNESS
+            else -> null
+        }
+    )
 
     // Photos behind the clock, except at night: a dark room should stay dark.
     LaunchedEffect(connected, wallpaperConfig, quiet) {
@@ -114,9 +139,10 @@ fun AmbientScreen(
     val alarms = (LocalContext.current.applicationContext as SmartDisplayApp).alarms
     val alarmList by alarms.alarms.collectAsStateWithLifecycle()
     val snooze by alarms.snooze.collectAsStateWithLifecycle()
+    val skip by alarms.skip.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val nextAlarm = remember(alarmList, snooze, now) {
-        nextRing(alarmList, snooze, now.atZone(ZoneId.systemDefault()))?.let { nextRingText(context, it) }
+    val nextAlarm = remember(alarmList, snooze, skip, now) {
+        nextRing(alarmList, snooze, now.atZone(ZoneId.systemDefault()), skip)?.let { nextRingText(context, it) }
     }
 
     AmbientContent(
@@ -127,7 +153,9 @@ fun AmbientScreen(
         weather = weather,
         forecast = forecast?.takeIf { it.first == weather?.entityId }?.second,
         night = home.sunIsDown() ?: quiet,
-        dimmed = quiet,
+        dimmed = quiet && glow == null,
+        sunrise = glow,
+        onImUp = { AlarmService.send(context, AlarmService.ACTION_AWAKE) },
         status = home.status,
         loaded = home.loaded,
         onTap = onOpenControls,
@@ -145,6 +173,8 @@ private fun AmbientContent(
     forecast: DailyForecast?,
     night: Boolean,
     dimmed: Boolean,
+    sunrise: Float?,
+    onImUp: () -> Unit,
     status: ConnectionStatus,
     loaded: Boolean,
     onTap: () -> Unit,
@@ -165,6 +195,7 @@ private fun AmbientContent(
             },
     ) {
         if (wallpaperUrl != null) WallpaperBackground(wallpaperUrl, wallpaperIntervalMillis)
+        if (sunrise != null) SunriseGlow(sunrise)
         val landscape = maxWidth > maxHeight
         // The clock's digit height drives everything else's size.
         val clock = if (landscape) minOf(maxHeight * 0.30f, maxWidth * 0.15f) else minOf(maxWidth * 0.26f, maxHeight * 0.15f)
@@ -200,21 +231,76 @@ private fun AmbientContent(
             status == ConnectionStatus.Connecting -> R.string.ambient_reconnecting
             else -> null
         }
-        if (hint != null) {
-            Text(
-                text = stringResource(hint),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 24.dp)
-                    .graphicsLayer { alpha = contentAlpha * 0.8f },
-            )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 24.dp),
+        ) {
+            if (sunrise != null) {
+                // During a sunrise: when it rings, and a way to say "I'm up" (skips this ring).
+                Text(
+                    text = stringResource(R.string.sunrise_ambient, nextAlarm.orEmpty()),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                FilledTonalButton(onClick = onImUp, modifier = Modifier.padding(top = 12.dp, bottom = 16.dp)) {
+                    Text(stringResource(R.string.sunrise_im_up), style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            if (hint != null) {
+                Text(
+                    text = stringResource(hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.graphicsLayer { alpha = contentAlpha * 0.8f },
+                )
+            }
         }
     }
 }
 
 private const val DRIFT_MS = 4_000
+
+/** How often the sunrise glow and screen brightness move on. */
+private const val SUNRISE_TICK_MS = 1_000L
+
+/**
+ * A sunrise from below the screen: at [progress] 0 a faint deep-red glow at the bottom edge, growing into a warm
+ * golden light across the screen by 1. It stays orange behind the clock, so white text stays readable.
+ */
+@Composable
+private fun SunriseGlow(progress: Float) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .drawBehind {
+                val p = progress.coerceIn(0f, 1f)
+                val core = sunriseColor(DAWN_CORE, MORNING_CORE, DAY_CORE, p)
+                val edge = sunriseColor(DAWN_EDGE, MORNING_EDGE, DAY_EDGE, p)
+                drawRect(
+                    Brush.radialGradient(
+                        0f to core.copy(alpha = 0.35f + 0.5f * p),
+                        0.55f to edge.copy(alpha = 0.25f + 0.5f * p),
+                        1f to Color.Transparent,
+                        center = Offset(size.width / 2, size.height * 1.1f),
+                        radius = size.height * (0.35f + 1.15f * p),
+                    )
+                )
+            },
+    )
+}
+
+/** Dawn colour at 0, morning at 0.5, day at 1. */
+private fun sunriseColor(dawn: Color, morning: Color, day: Color, p: Float): Color =
+    if (p < 0.5f) lerp(dawn, morning, p * 2) else lerp(morning, day, p * 2 - 1)
+
+private val DAWN_CORE = Color(0xFF8A1E00)
+private val DAWN_EDGE = Color(0xFF3A0800)
+private val MORNING_CORE = Color(0xFFFF7A1A)
+private val MORNING_EDGE = Color(0xFFB8400A)
+private val DAY_CORE = Color(0xFFFFC27A)
+private val DAY_EDGE = Color(0xFFE0702A)
 
 /** A photo's pan and zoom lasts as long as it's shown, within these limits. */
 private const val MIN_MOVE_MS = 20_000L
@@ -401,6 +487,8 @@ private fun AmbientLandscapePreview() {
             forecast = DailyForecast(78.0, 61.0),
             night = false,
             dimmed = false,
+            sunrise = null,
+            onImUp = {},
             status = ConnectionStatus.Connected,
             loaded = true,
             onTap = {},
@@ -422,6 +510,8 @@ private fun AmbientPortraitPreview() {
             forecast = DailyForecast(15.0, 9.0),
             night = true,
             dimmed = true,
+            sunrise = null,
+            onImUp = {},
             status = ConnectionStatus.Waiting(0, DisconnectReason.Unreachable),
             loaded = true,
             onTap = {},

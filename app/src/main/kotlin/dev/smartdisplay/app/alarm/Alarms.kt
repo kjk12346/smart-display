@@ -36,6 +36,8 @@ data class AlarmActions(
     /** A `media-source://` sound from Home Assistant's media browser. */
     val soundId: String? = null,
     val soundTitle: String? = null,
+    /** Minutes before the alarm that the lights and screen start to brighten, like a sunrise; 0 is off. */
+    val sunriseMinutes: Int = DEFAULT_SUNRISE_MINUTES,
 ) {
     val usesHomeAssistant: Boolean get() = lights.isNotEmpty() || (speaker != null && soundId != null)
 }
@@ -56,6 +58,11 @@ class Alarms(private val context: Context) {
     private val _actions = MutableStateFlow(loadActions())
     val actions: StateFlow<AlarmActions> = _actions.asStateFlow()
 
+    private val _skip = MutableStateFlow(loadSkip())
+
+    /** A ring that won't happen, because someone was up before it. */
+    val skip: StateFlow<Skip?> = _skip.asStateFlow()
+
     fun add(hour: Int, minute: Int, days: Set<DayOfWeek>, label: String): Alarm {
         val id = prefs.getInt(KEY_NEXT_ID, 1)
         val alarm = Alarm(id, hour, minute, days, label.trim())
@@ -75,6 +82,7 @@ class Alarms(private val context: Context) {
     /** For between guests: removes every alarm and any snooze. */
     fun clearAll() {
         setSnooze(null, reschedule = false)
+        setSkip(null, reschedule = false)
         saveAlarms(emptyList())
     }
 
@@ -85,8 +93,11 @@ class Alarms(private val context: Context) {
             putString(KEY_SPEAKER, actions.speaker)
             putString(KEY_SOUND_ID, actions.soundId)
             putString(KEY_SOUND_TITLE, actions.soundTitle)
+            putInt(KEY_SUNRISE, actions.sunriseMinutes)
         }
+        val sunriseChanged = actions.sunriseMinutes != _actions.value.sunriseMinutes
         _actions.value = actions
+        if (sunriseChanged) reschedule()
     }
 
     /** Called when [alarm] starts ringing: a one-time alarm turns itself off, and the next ring is scheduled. */
@@ -105,13 +116,23 @@ class Alarms(private val context: Context) {
 
     fun clearSnooze() = setSnooze(null)
 
-    fun next(now: ZonedDateTime = ZonedDateTime.now()): NextRing? = nextRing(_alarms.value, _snooze.value, now)
+    /**
+     * Someone was up before [alarmId] rang at [ringMillis] ("I'm up" during its sunrise): a one-time alarm turns off,
+     * and a repeating one skips just this ring.
+     */
+    fun imUp(alarmId: Int, ringMillis: Long) {
+        val alarm = alarm(alarmId) ?: return
+        if (alarm.repeats) setSkip(Skip(alarmId, ringMillis)) else update(alarm.copy(enabled = false))
+    }
+
+    fun next(now: ZonedDateTime = ZonedDateTime.now()): NextRing? =
+        nextRing(_alarms.value, _snooze.value, now, _skip.value)
 
     /** Schedules the next ring with Android (or cancels, if there's none). Safe to call any time. */
     fun reschedule() {
         val manager = context.getSystemService(AlarmManager::class.java)
-        val fire = fireIntent()
-        manager.cancel(fire)
+        manager.cancel(fireIntent())
+        manager.cancel(sunriseIntent())
         val next = next() ?: return
         val at = next.at.toInstant().toEpochMilli()
         val show = PendingIntent.getActivity(
@@ -124,6 +145,17 @@ class Alarms(private val context: Context) {
             Log.w(TAG, "Exact alarms not allowed; scheduling inexactly", e)
             manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, fireIntent(next))
         }
+        // The sunrise starts that long before (straight away if the alarm is sooner than that). Not for a snooze:
+        // the lights are already up.
+        val sunrise = _actions.value.sunriseMinutes
+        if (sunrise > 0 && !next.snoozed) {
+            val start = maxOf(at - sunrise * 60_000L, System.currentTimeMillis())
+            try {
+                manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, start, sunriseIntent(next))
+            } catch (e: SecurityException) {
+                manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, start, sunriseIntent(next))
+            }
+        }
     }
 
     fun alarm(id: Int): Alarm? = _alarms.value.firstOrNull { it.id == id }
@@ -134,6 +166,36 @@ class Alarms(private val context: Context) {
         return PendingIntent.getBroadcast(
             context, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+    }
+
+    private fun sunriseIntent(next: NextRing? = null): PendingIntent {
+        val intent = Intent(context, AlarmReceiver::class.java).setAction(AlarmReceiver.ACTION_SUNRISE)
+        if (next != null) {
+            intent.putExtra(AlarmReceiver.EXTRA_ALARM_ID, next.alarm.id)
+            intent.putExtra(AlarmReceiver.EXTRA_RING_AT, next.at.toInstant().toEpochMilli())
+        }
+        return PendingIntent.getBroadcast(
+            context, 1, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+    }
+
+    private fun setSkip(skip: Skip?, reschedule: Boolean = true) {
+        prefs.edit {
+            if (skip == null) {
+                remove(KEY_SKIP_ID)
+                remove(KEY_SKIP_AT)
+            } else {
+                putInt(KEY_SKIP_ID, skip.alarmId)
+                putLong(KEY_SKIP_AT, skip.atMillis)
+            }
+        }
+        _skip.value = skip
+        if (reschedule) reschedule()
+    }
+
+    private fun loadSkip(): Skip? {
+        if (!prefs.contains(KEY_SKIP_ID)) return null
+        return Skip(prefs.getInt(KEY_SKIP_ID, 0), prefs.getLong(KEY_SKIP_AT, 0))
     }
 
     private fun setSnooze(snooze: Snooze?, reschedule: Boolean = true) {
@@ -170,6 +232,7 @@ class Alarms(private val context: Context) {
         speaker = prefs.getString(KEY_SPEAKER, null),
         soundId = prefs.getString(KEY_SOUND_ID, null),
         soundTitle = prefs.getString(KEY_SOUND_TITLE, null),
+        sunriseMinutes = prefs.getInt(KEY_SUNRISE, DEFAULT_SUNRISE_MINUTES),
     )
 
     companion object {
@@ -184,6 +247,9 @@ class Alarms(private val context: Context) {
         private const val KEY_SPEAKER = "action_speaker"
         private const val KEY_SOUND_ID = "action_sound_id"
         private const val KEY_SOUND_TITLE = "action_sound_title"
+        private const val KEY_SUNRISE = "action_sunrise_minutes"
+        private const val KEY_SKIP_ID = "skip_id"
+        private const val KEY_SKIP_AT = "skip_at"
 
         internal fun encode(alarms: List<Alarm>): String = buildJsonArray {
             alarms.forEach { alarm ->
