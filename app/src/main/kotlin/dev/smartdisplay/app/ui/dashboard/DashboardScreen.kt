@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -257,8 +258,11 @@ fun DashboardScreen(
                         // The photo only where the column is tall enough for it to be more than a strip.
                         BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
                             val photo = maxHeight >= 520.dp
+                            val peopleMax = maxHeight * 0.6f
                             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                peopleCard(Modifier.weight(1f).fillMaxWidth(), true)
+                                // Who's home takes what it needs (its Home and Away buttons included), up to most of
+                                // the column; the buttons get the rest.
+                                peopleCard(Modifier.fillMaxWidth().heightIn(max = peopleMax), true)
                                 buttonsCard(Modifier.weight(1f).fillMaxWidth(), true)
                                 if (photo) PhotoTile(photoUrl, wallpaperConfig, Modifier.weight(1.2f).fillMaxWidth())
                             }
@@ -406,14 +410,18 @@ private fun PeopleCard(
         val homeAction = kitchen.homeAction
         val awayAction = kitchen.awayAction
         if (homeAction != null || awayAction != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 16.dp)) {
+            // Side by side in equal halves, so neither gets squeezed in a narrow column.
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            ) {
                 if (homeAction != null) {
                     val label = stringResource(R.string.mode_home)
-                    RunButton(label, runs[homeAction], filled = true) { onRun(homeAction) }
+                    RunButton(label, runs[homeAction], filled = true, Modifier.weight(1f)) { onRun(homeAction) }
                 }
                 if (awayAction != null) {
                     val label = stringResource(R.string.mode_away)
-                    RunButton(label, runs[awayAction], filled = false) { onRun(awayAction) }
+                    RunButton(label, runs[awayAction], filled = false, Modifier.weight(1f)) { onRun(awayAction) }
                 }
             }
         }
@@ -448,23 +456,31 @@ private fun ButtonsCard(
 
 /** A big button that runs something, showing for a moment whether it worked. */
 @Composable
-private fun RunButton(label: String, state: RunState?, filled: Boolean, onClick: () -> Unit) {
+private fun RunButton(
+    label: String,
+    state: RunState?,
+    filled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     val text = when (state) {
         RunState.Running -> "…"
         RunState.Done -> stringResource(R.string.run_done)
         RunState.Failed -> stringResource(R.string.run_failed)
         null -> label
     }
-    val modifier = Modifier.heightIn(min = 64.dp).widthIn(min = 120.dp)
+    val size = modifier.heightIn(min = 64.dp).widthIn(min = 120.dp)
+    val padding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
     val content: @Composable () -> Unit = {
         Text(text, fontSize = 18.sp, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
     if (filled) {
-        Button(onClick = onClick, modifier = modifier) { content() }
+        Button(onClick = onClick, modifier = size, contentPadding = padding) { content() }
     } else {
         FilledTonalButton(
             onClick = onClick,
-            modifier = modifier,
+            modifier = size,
+            contentPadding = padding,
             colors = if (state == RunState.Failed) {
                 ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
             } else {

@@ -54,7 +54,7 @@ import java.util.Locale
 data class CalendarOwner(val id: String, val name: String, val color: Color)
 
 /** Each day in the grid gets at least this much width: as many days as fit, up to a week. */
-private val MIN_DAY_WIDTH = 100.dp
+private val MIN_DAY_WIDTH = 84.dp
 
 /** Fewer days than this fit, and the calendar is a list instead. */
 private const val MIN_GRID_DAYS = 3

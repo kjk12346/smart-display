@@ -97,8 +97,13 @@ Home Assistant.
 - Layout: wide screens give the calendar most of the width (a column per day, as many as fit at 100 dp up to 7; a list
   if under 3) with Who's home, Buttons and the photo (only if the column is tall enough) beside it. Narrow screens
   stack calendar first and scroll; cards must not scroll by themselves there (nested vertical scrolling crashes).
-- Checked on the Pixel 6 in portrait and landscape (2026-10-09). Not yet on a tablet, or with calendars assigned to
-  people.
+- Checked on the Pixel 6 in portrait and landscape (2026-10-09), and on the owner's TCL tablet (Android 15,
+  1200×1920 at 320 dpi, landscape 960×600 dp) on 2026-10-23: a full week fits (84 dp minimum per day), Who's home
+  takes the height it needs (up to 60% of the side column) with Home and Away in equal halves; the photo tile doesn't
+  fit beside them at that height. Not yet with calendars assigned to people.
+- TCL's Smart Manager blocks "background auto-launch" for new apps, which would stop alarms, the sunrise and the
+  wind-down from starting the app (and rescheduling after a reboot). The owner has to allow it in Smart Manager; the
+  app can't. Other makers (Xiaomi, Huawei, Samsung's sleeping apps) do the same: worth a first-run hint later.
 - **Burn-in:** by day the dashboard gives way to the clock over the photos (the ambient screen, which already drifts)
   after `KitchenConfig.screensaverMinutes` untouched (Settings, default 10, or never); at night after 2 minutes, as
   before. A tap brings the dashboard back. The dashboard itself also drifts by `burnInOffset` each minute.
