@@ -321,6 +321,7 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                             onOpenControls = { screen = Screen.Controls },
                             onOpenAlarms = { screen = Screen.Alarms },
                             onOpenSettings = openSettings,
+                            onDone = { screen = Screen.Ambient },
                         )
                     }
                     // Left alone, it gives way to the clock: soon at night, and by day after the screensaver time,

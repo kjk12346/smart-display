@@ -84,6 +84,8 @@ import java.time.format.TextStyle
  * The kitchen display's daytime screen: the time and weather with a few days' forecast, the family calendar, who's
  * home with Home and Away buttons, the owner's buttons for scenes, scripts and automations, and a photo.
  *
+ * Done goes straight to the clock over the photos, as being left alone does after a while.
+ *
  * Wide screens give most of the room to the calendar's week, with the rest in a column beside it; narrow ones stack
  * everything, calendar first, and scroll. With no calendars shown, the calendar is left out and the rest share the
  * width. Each person has a color, on their calendar events and their avatar.
@@ -96,6 +98,7 @@ fun DashboardScreen(
     onOpenControls: () -> Unit,
     onOpenAlarms: () -> Unit,
     onOpenSettings: () -> Unit,
+    onDone: () -> Unit,
     ambient: AmbientViewModel = viewModel(),
     viewModel: DashboardViewModel = viewModel(),
 ) {
@@ -173,6 +176,12 @@ fun DashboardScreen(
         TextButton(onClick = onOpenAlarms) { Text(stringResource(R.string.alarms_button)) }
         TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_eyebrow)) }
     }
+    // Straight to the screensaver (the clock over the photos), rather than waiting for it.
+    val doneButton: @Composable () -> Unit = {
+        FilledTonalButton(onClick = onDone, modifier = Modifier.padding(start = 8.dp)) {
+            Text(stringResource(R.string.settings_done))
+        }
+    }
     // Wide: one row. Narrow: the clock and weather, then the forecast, then the buttons, each on its own line.
     val header: @Composable (wide: Boolean) -> Unit = { wide ->
         if (wide) {
@@ -184,6 +193,7 @@ fun DashboardScreen(
                 Spacer(Modifier.weight(1f))
                 // Two by two, so a fourth button (Wind down) doesn't make the header taller.
                 FlowRow(maxItemsInEachRow = 2, horizontalArrangement = Arrangement.End) { navButtons() }
+                doneButton()
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -193,7 +203,10 @@ fun DashboardScreen(
                     currentWeather()
                 }
                 ForecastStrip(days, today = now.toLocalDate())
-                Row { navButtons() }
+                FlowRow(verticalArrangement = Arrangement.Center) {
+                    navButtons()
+                    doneButton()
+                }
             }
         }
     }
