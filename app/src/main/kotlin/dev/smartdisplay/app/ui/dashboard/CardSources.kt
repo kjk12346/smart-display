@@ -48,14 +48,7 @@ internal fun CardSourcesDialog(
     when (card.type) {
         CardType.Calendar -> CalendarSources(kitchen, home, onKitchenChange, onDismiss)
         CardType.People -> PeopleSources(kitchen, home, onKitchenChange, onDismiss)
-        CardType.Buttons -> ChoiceDialog(
-            title = stringResource(R.string.kitchen_buttons_choose),
-            items = home.runnables().map { it.entityId to it.friendlyName },
-            selected = kitchen.shortcuts.toSet(),
-            multiple = true,
-            onChange = { id, on -> onKitchenChange(kitchen.copy(shortcuts = kitchen.shortcuts.toggled(id, on))) },
-            onDismiss = onDismiss,
-        )
+        CardType.Buttons -> ButtonsSources(kitchen, home, onKitchenChange, onDismiss)
         CardType.Devices -> DevicesSources(card, home, onCardChange, onDismiss)
         CardType.Weather -> WeatherSourceDialog(kitchen, home, onKitchenChange, onDismiss)
         CardType.Sensors -> ChoiceDialog(

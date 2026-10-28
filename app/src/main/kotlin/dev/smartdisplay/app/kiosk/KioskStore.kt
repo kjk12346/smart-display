@@ -78,6 +78,8 @@ class KioskStore(context: Context) {
         putStringSet(KEY_KITCHEN_HIDDEN_PEOPLE, kitchen.hiddenPeople)
         putString(KEY_KITCHEN_WEATHER, kitchen.weatherEntity)
         putString(KEY_KITCHEN_STATUS, encodeIds(kitchen.statusEntities))
+        putString(KEY_KITCHEN_SHORTCUT_NAMES, encodeMap(kitchen.shortcutNames))
+        putString(KEY_KITCHEN_SHORTCUT_ICONS, encodeMap(kitchen.shortcutIcons))
     }
 
     fun setPin(pin: String) {
@@ -147,6 +149,8 @@ class KioskStore(context: Context) {
             hiddenPeople = prefs.getStringSet(KEY_KITCHEN_HIDDEN_PEOPLE, null)?.toSet().orEmpty(),
             weatherEntity = prefs.getString(KEY_KITCHEN_WEATHER, null),
             statusEntities = decodeIds(prefs.getString(KEY_KITCHEN_STATUS, null)),
+            shortcutNames = decodeMap(prefs.getString(KEY_KITCHEN_SHORTCUT_NAMES, null)),
+            shortcutIcons = decodeMap(prefs.getString(KEY_KITCHEN_SHORTCUT_ICONS, null)),
         ),
     )
 
@@ -176,6 +180,8 @@ class KioskStore(context: Context) {
         const val KEY_KITCHEN_HIDDEN_PEOPLE = "kitchen_hidden_people"
         const val KEY_KITCHEN_WEATHER = "kitchen_weather"
         const val KEY_KITCHEN_STATUS = "kitchen_status"
+        const val KEY_KITCHEN_SHORTCUT_NAMES = "kitchen_shortcut_names"
+        const val KEY_KITCHEN_SHORTCUT_ICONS = "kitchen_shortcut_icons"
     }
 }
 

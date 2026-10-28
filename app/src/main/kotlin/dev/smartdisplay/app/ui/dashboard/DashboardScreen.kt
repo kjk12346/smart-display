@@ -4,6 +4,9 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.border
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -361,9 +364,11 @@ fun DashboardScreen(
         }
     }
     val buttonsCard: @Composable (Modifier, Boolean) -> Unit = { modifier, scroll ->
+        val shown = kitchen.shortcuts.filter { it in names }
         ButtonsCard(
-            shortcuts = kitchen.shortcuts.filter { it in names },
-            nameOf = { names[it]?.friendlyName ?: it },
+            shortcuts = shown,
+            labels = shortLabels(shown.associateWith { names[it]?.friendlyName ?: it }, kitchen.shortcutNames),
+            icons = kitchen.shortcutIcons,
             runs = runs,
             onRun = viewModel::run,
             modifier = modifier,
@@ -424,11 +429,8 @@ fun DashboardScreen(
             onDismissRequest = { resetting = null },
             title = { Text(stringResource(R.string.dashboard_reset_title)) },
             text = {
-                Text(
-                    stringResource(
-                        if (grid == WIDE_GRID) R.string.dashboard_reset_wide_body else R.string.dashboard_reset_tall_body,
-                    ),
-                )
+                val wide = grid == WIDE_GRID
+                Text(stringResource(if (wide) R.string.dashboard_reset_wide_body else R.string.dashboard_reset_tall_body))
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -697,43 +699,37 @@ private fun PeopleCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        people.forEach { person ->
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 6.dp)) {
+        // Just their initials: in their color when home, a ring of it when not.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            people.forEach { person ->
                 val home = person.presence == Presence.Home
+                val color = colorOf(person.entityId) ?: MaterialTheme.colorScheme.primary
+                val where = when (person.presence) {
+                    Presence.Home -> stringResource(R.string.presence_home)
+                    Presence.Away -> person.place ?: stringResource(R.string.presence_away)
+                    Presence.Unknown -> stringResource(R.string.presence_unknown)
+                }
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
-                        .background(
+                        .then(
                             if (home) {
-                                colorOf(person.entityId) ?: MaterialTheme.colorScheme.primary
+                                Modifier.background(color)
                             } else {
-                                MaterialTheme.colorScheme.surfaceContainerHighest
-                            }
-                        ),
+                                Modifier.border(2.5.dp, color.copy(alpha = 0.6f), CircleShape)
+                            },
+                        )
+                        .semantics(mergeDescendants = true) { contentDescription = "${person.name}, $where" },
                 ) {
                     Text(
                         person.initials,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (home) OnPersonColor else MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                Column(modifier = Modifier.padding(start = 12.dp)) {
-                    Text(
-                        person.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        when (person.presence) {
-                            Presence.Home -> stringResource(R.string.presence_home)
-                            Presence.Away -> person.place ?: stringResource(R.string.presence_away)
-                            Presence.Unknown -> stringResource(R.string.presence_unknown)
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = if (home) OnPersonColor else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -762,7 +758,8 @@ private fun PeopleCard(
 @Composable
 private fun ButtonsCard(
     shortcuts: List<String>,
-    nameOf: (String) -> String,
+    labels: Map<String, String>,
+    icons: Map<String, String>,
     runs: Map<String, RunState>,
     onRun: (String) -> Unit,
     modifier: Modifier,
@@ -776,11 +773,62 @@ private fun ButtonsCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        // Tiles as many across as fit.
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val columns = ((maxWidth + TILE_GAP) / (TILE_MIN_WIDTH + TILE_GAP)).toInt().coerceAtLeast(1)
+            val width = (maxWidth - TILE_GAP * (columns - 1)) / columns
+            Column(verticalArrangement = Arrangement.spacedBy(TILE_GAP)) {
+                shortcuts.chunked(columns).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
+                        row.forEach { id ->
+                            ShortcutTile(
+                                label = labels[id] ?: id,
+                                icon = icons[id],
+                                state = runs[id],
+                                modifier = Modifier.width(width),
+                            ) { onRun(id) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private val TILE_MIN_WIDTH = 68.dp
+private val TILE_GAP = 10.dp
+
+/** A button as a tile: its icon in a circle (which shows for a moment whether it worked), its short name under it. */
+@Composable
+private fun ShortcutTile(label: String, icon: String?, state: RunState?, modifier: Modifier, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = if (state == RunState.Failed) {
+            MaterialTheme.colorScheme.errorContainer
+        } else {
+            MaterialTheme.colorScheme.secondaryContainer
+        },
+        modifier = modifier,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
         ) {
-            shortcuts.forEach { id -> RunButton(nameOf(id), runs[id], filled = false) { onRun(id) } }
+            when (state) {
+                RunState.Running -> ShortcutIcon("\u2026", label)
+                RunState.Done -> ShortcutIcon("\u2713", label)
+                RunState.Failed -> ShortcutIcon("!", label)
+                null -> ShortcutIcon(icon, label)
+            }
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 6.dp),
+            )
         }
     }
 }

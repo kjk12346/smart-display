@@ -128,7 +128,13 @@ Home Assistant.
   in `AmbientViewModel`); integrations without hourly forecasts fall back to the days. Night icons per hour from
   `sun.sun`'s next rising / setting (`SunTimes`). A Weather card (one, sources = the dashboard's weather entity):
   now with feels-like, wind, humidity and the next sunrise or sunset, a 12-hour graph (temperature line, rain-chance
-  bars), then the days. Header checked on the 15.6" tablet (Met.no, portrait); the card not yet on a device.
+  bars), then the days. No title; it fits its size (`WeatherCard`): stacked, with the graph taking the height left
+  and the days only if there's room, or now and the graph side by side in a short, wide card. Checked on the 15.6"
+  tablet (Met.no): header in both orientations, the card stacked (landscape, before the fit) and side by side.
+- **Who's home and Buttons (2026-10-28):** Who's home shows only initials circles (filled in the person's color when
+  home, a ring when not). Buttons are tiles: an icon circle (an emoji the owner picks, else the first letter) and a
+  short name (`shortLabels`: the owner's, else the name without the words all the buttons share). Set per button in
+  the card's Sources (`Shortcuts.kt`; `KitchenConfig.shortcutNames` / `shortcutIcons`).
 - **Header in portrait (tablets ≥ 600 dp):** two rows: clock, weather and as many hours as fit (fixed-width
   columns, `fitting()`), then the status chips beside the buttons (one line of buttons when there are no chips, two
   by two when there are). Phones still give the forecast and the chips their own lines.

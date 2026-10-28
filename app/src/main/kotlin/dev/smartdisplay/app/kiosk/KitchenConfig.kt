@@ -34,6 +34,10 @@ data class KitchenConfig(
     val weatherEntity: String? = null,
     /** Sensors, doors, locks and the like shown as chips across the top of the dashboard, in this order. */
     val statusEntities: List<String> = emptyList(),
+    /** Short names the owner gave buttons, by entity ID; others are shortened by themselves (`shortLabels`). */
+    val shortcutNames: Map<String, String> = emptyMap(),
+    /** An emoji for each button that has one, by entity ID; the rest show their first letter. */
+    val shortcutIcons: Map<String, String> = emptyMap(),
 )
 
 const val DEFAULT_SCREENSAVER_MINUTES = 10

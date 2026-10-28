@@ -131,6 +131,11 @@
     <string name="card_camera_choose">Choose a camera</string>
     <string name="card_player_choose">Choose a speaker or TV</string>
     <string name="card_weather">Weather</string>
+    <string name="buttons_count">%1$d chosen</string>
+    <string name="buttons_edit_note">Tap one to give it a short name or an icon.</string>
+    <string name="buttons_short_name">Short name</string>
+    <string name="buttons_icon">Icon</string>
+    <string name="buttons_save">Save</string>
     <string name="card_weather_about">Now, a graph of the next 12 hours with the chance of rain, and the days ahead.</string>
     <string name="card_weather_none">No weather in Home Assistant yet. Add a weather integration, such as Met.no.</string>
     <string name="weather_feels">Feels %1$s</string>

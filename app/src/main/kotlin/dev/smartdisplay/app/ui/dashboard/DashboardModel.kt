@@ -23,6 +23,30 @@ fun HomeState.runnables(): List<EntityState> = entities.values
     .filterNot { registry[it.entityId]?.let { entry -> entry.hidden || entry.disabled } == true }
     .sortedBy { it.friendlyName.lowercase() }
 
+/**
+ * Short names for the buttons, by entity ID: the owner's own where given ([chosen]), else each name without the words
+ * every one of them starts with ("Away mode: guest room at night" and "Away mode: living room at sunset" become
+ * "Guest room at night" and "Living room at sunset"). A lone button keeps its whole name.
+ */
+fun shortLabels(names: Map<String, String>, chosen: Map<String, String> = emptyMap()): Map<String, String> {
+    val shared = sharedWords(names.values.toList())
+    return names.mapValues { (id, name) ->
+        chosen[id]?.trim()?.takeIf { it.isNotEmpty() }
+            ?: name.split(' ').drop(shared).joinToString(" ").trimStart(' ', ':', '-', '\u2013', '\u00b7', ',')
+                .ifEmpty { name }
+                .replaceFirstChar { it.uppercase() }
+    }
+}
+
+/** How many words all of [names] start with, leaving each at least one of its own; none for fewer than two names. */
+private fun sharedWords(names: List<String>): Int {
+    if (names.size < 2) return 0
+    val words = names.map { it.trim().split(' ') }
+    var n = 0
+    while (words.all { it.size > n + 1 && it[n].equals(words[0][n], ignoreCase = true) }) n++
+    return n
+}
+
 enum class Presence { Home, Away, Unknown }
 
 /** A person in Home Assistant, and where they are: home, away, or in a named zone ([place], such as "Work"). */
