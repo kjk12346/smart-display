@@ -106,6 +106,17 @@ Home Assistant.
 - TCL's Smart Manager blocks "background auto-launch" for new apps, which would stop alarms, the sunrise and the
   wind-down from starting the app (and rescheduling after a reboot). The owner has to allow it in Smart Manager; the
   app can't. Other makers (Xiaomi, Huawei, Samsung's sleeping apps) do the same: worth a first-run hint later.
+- **Arranging cards (added 2026-10-28):** the cards sit on a grid, 12×8 cells in landscape (`WIDE_GRID`) and 6×12 in
+  portrait (`TALL_GRID`, tablets ≥ 600 dp wide); phones stack them in the portrait order. Each card has a place on
+  both (`kiosk/DashLayout.kt`, saved in `KitchenConfig.layout`; the default is the old fixed layout). A long press on
+  the dashboard (behind the exit PIN) starts arranging (`CardGrid`): drag to move, the corner to resize, snapping to
+  cells and refusing overlaps; Hide; Sources (`CardSources.kt`: calendars and whose, who's shown and Home/Away,
+  buttons, and the weather entity, which the clock screen shares); Add card. Calendar, Who's home and Buttons are one
+  each and use `KitchenConfig`; Devices (an area's controls plus picked ones, via `ControlCard`), Sensors, Now
+  playing and Camera (`entity_picture` refreshed every 10 s) keep their own sources and can be added more than
+  once. A new card must fit on the grid on screen; on the other, the biggest cards shrink a row or column to make
+  room. Checked on the 15.6" tablet: PIN prompt, resize, move, Add card's list. The new card types aren't yet
+  checked against real devices.
 - **Burn-in:** by day the dashboard gives way to the clock over the photos (the ambient screen, which already drifts)
   after `KitchenConfig.screensaverMinutes` untouched (Settings, default 10, or never); at night after 2 minutes, as
   before. A tap brings the dashboard back. The dashboard itself also drifts by `burnInOffset` each minute.

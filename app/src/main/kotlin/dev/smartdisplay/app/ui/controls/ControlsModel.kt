@@ -173,6 +173,10 @@ object Calls {
 
     fun playPause(entityId: String) = ServiceCall("media_player", "media_play_pause", entityId)
 
+    fun previousTrack(entityId: String) = ServiceCall("media_player", "media_previous_track", entityId)
+
+    fun nextTrack(entityId: String) = ServiceCall("media_player", "media_next_track", entityId)
+
     fun volume(entityId: String, level: Float) = ServiceCall(
         "media_player", "volume_set", entityId, buildJsonObject { put("volume_level", level.coerceIn(0f, 1f)) },
     )

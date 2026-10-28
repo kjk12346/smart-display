@@ -26,6 +26,12 @@ data class KitchenConfig(
      * burn-in; 0 for never. At night it always does, after 2 minutes.
      */
     val screensaverMinutes: Int = DEFAULT_SCREENSAVER_MINUTES,
+    /** The dashboard's cards and where they are, as arranged in its edit mode. */
+    val layout: DashLayout = DashLayout(),
+    /** People left out of Who's home; everyone else shows, including people added later. */
+    val hiddenPeople: Set<String> = emptySet(),
+    /** The weather shown on the dashboard and the clock; null for the first weather entity. */
+    val weatherEntity: String? = null,
 )
 
 const val DEFAULT_SCREENSAVER_MINUTES = 10

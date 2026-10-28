@@ -74,6 +74,9 @@ class KioskStore(context: Context) {
         putString(KEY_KITCHEN_PERSON_COLORS, encodeMap(kitchen.personColors.mapValues { it.value.name }))
         putString(KEY_KITCHEN_EVENT_PEOPLE, encodeListMap(kitchen.eventPeople))
         putInt(KEY_KITCHEN_SCREENSAVER, kitchen.screensaverMinutes)
+        putString(KEY_KITCHEN_LAYOUT, encodeLayout(kitchen.layout))
+        putStringSet(KEY_KITCHEN_HIDDEN_PEOPLE, kitchen.hiddenPeople)
+        putString(KEY_KITCHEN_WEATHER, kitchen.weatherEntity)
     }
 
     fun setPin(pin: String) {
@@ -139,6 +142,9 @@ class KioskStore(context: Context) {
             }.toMap(),
             eventPeople = decodeListMap(prefs.getString(KEY_KITCHEN_EVENT_PEOPLE, null)),
             screensaverMinutes = prefs.getInt(KEY_KITCHEN_SCREENSAVER, DEFAULT_SCREENSAVER_MINUTES),
+            layout = decodeLayout(prefs.getString(KEY_KITCHEN_LAYOUT, null)) ?: DashLayout(),
+            hiddenPeople = prefs.getStringSet(KEY_KITCHEN_HIDDEN_PEOPLE, null)?.toSet().orEmpty(),
+            weatherEntity = prefs.getString(KEY_KITCHEN_WEATHER, null),
         ),
     )
 
@@ -164,6 +170,9 @@ class KioskStore(context: Context) {
         const val KEY_KITCHEN_PERSON_COLORS = "kitchen_person_colors"
         const val KEY_KITCHEN_EVENT_PEOPLE = "kitchen_event_people"
         const val KEY_KITCHEN_SCREENSAVER = "kitchen_screensaver_minutes"
+        const val KEY_KITCHEN_LAYOUT = "kitchen_layout"
+        const val KEY_KITCHEN_HIDDEN_PEOPLE = "kitchen_hidden_people"
+        const val KEY_KITCHEN_WEATHER = "kitchen_weather"
     }
 }
 

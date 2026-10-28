@@ -95,9 +95,11 @@ fun AmbientScreen(
     onOpenSettings: () -> Unit,
     /** Keep showing photos (dimmed) in quiet hours: for a kitchen, which needn't be dark like a bedroom. */
     photosAtNight: Boolean = false,
+    /** The weather entity the owner chose (a kitchen display's, shared with its dashboard); null for the first. */
+    weatherEntity: String? = null,
     viewModel: AmbientViewModel = viewModel(),
 ) {
-    val weather = home.primaryWeatherEntity()?.toCurrentWeather()
+    val weather = home.primaryWeatherEntity(weatherEntity)?.toCurrentWeather()
     val now by rememberMinuteClock()
     val quiet = isQuietHours(now.toLocalTime())
     val photos = !quiet || photosAtNight

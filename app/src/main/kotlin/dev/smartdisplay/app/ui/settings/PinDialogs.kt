@@ -28,9 +28,14 @@ import kotlinx.coroutines.launch
 
 private const val MAX_PIN_LENGTH = 8
 
-/** Asks for the exit PIN before opening settings. */
+/** Asks for the exit PIN before opening settings, or before what [confirmLabel] says. */
 @Composable
-fun EnterPinDialog(check: suspend (String) -> PinCheck, onCorrect: () -> Unit, onDismiss: () -> Unit) {
+fun EnterPinDialog(
+    check: suspend (String) -> PinCheck,
+    onCorrect: () -> Unit,
+    onDismiss: () -> Unit,
+    confirmLabel: Int = R.string.pin_open_settings,
+) {
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(false) }
@@ -74,7 +79,7 @@ fun EnterPinDialog(check: suspend (String) -> PinCheck, onCorrect: () -> Unit, o
         },
         confirmButton = {
             TextButton(onClick = submit, enabled = pin.length >= 4 && !checking) {
-                Text(stringResource(R.string.pin_open_settings))
+                Text(stringResource(confirmLabel))
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },

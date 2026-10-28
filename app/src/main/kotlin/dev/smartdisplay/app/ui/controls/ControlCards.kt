@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.smartdisplay.app.R
 import kotlin.math.roundToInt
@@ -306,9 +307,9 @@ private fun SentSlider(value: Float, onSend: (Float) -> Unit) {
 }
 
 @Composable
-private fun PlayPauseGlyph(playing: Boolean) {
+internal fun PlayPauseGlyph(playing: Boolean, glyphSize: Dp = 18.dp) {
     val color = LocalContentColor.current
-    Canvas(Modifier.size(18.dp)) {
+    Canvas(Modifier.size(glyphSize)) {
         val w = size.width
         val h = size.height
         if (playing) {

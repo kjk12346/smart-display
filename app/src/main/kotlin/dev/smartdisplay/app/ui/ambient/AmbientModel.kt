@@ -27,12 +27,19 @@ data class DailyForecast(val high: Double?, val low: Double?)
 
 private val UNAVAILABLE = setOf("unavailable", "unknown")
 
-/** The weather entity to show: the first by entity ID that isn't hidden or disabled in Home Assistant. */
-fun HomeState.primaryWeatherEntity(): EntityState? =
+/**
+ * The weather entity to show: [preferred] (the owner's choice) if it still exists, else the first by entity ID that
+ * isn't hidden or disabled in Home Assistant.
+ */
+fun HomeState.primaryWeatherEntity(preferred: String? = null): EntityState? =
+    preferred?.let { entities[it] } ?: weatherEntities().firstOrNull()
+
+/** The weather entities that aren't hidden or disabled, by entity ID. */
+fun HomeState.weatherEntities(): List<EntityState> =
     entities.values
         .filter { it.domain == "weather" }
         .filterNot { registry[it.entityId]?.let { entry -> entry.hidden || entry.disabled } == true }
-        .minByOrNull { it.entityId }
+        .sortedBy { it.entityId }
 
 fun EntityState.toCurrentWeather(): CurrentWeather? {
     if (state in UNAVAILABLE) return null

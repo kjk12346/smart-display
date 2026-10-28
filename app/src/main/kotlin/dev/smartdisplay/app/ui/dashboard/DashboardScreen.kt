@@ -3,6 +3,7 @@ package dev.smartdisplay.app.ui.dashboard
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -25,6 +27,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -35,14 +38,19 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -60,9 +68,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.smartdisplay.app.R
 import dev.smartdisplay.app.ha.ConnectionStatus
 import dev.smartdisplay.app.ha.HomeState
+import dev.smartdisplay.app.kiosk.CardType
+import dev.smartdisplay.app.kiosk.DashCard
+import dev.smartdisplay.app.kiosk.DashLayout
+import dev.smartdisplay.app.kiosk.Grid
 import dev.smartdisplay.app.kiosk.KitchenConfig
-import dev.smartdisplay.app.kiosk.personColors
+import dev.smartdisplay.app.kiosk.TALL_GRID
+import dev.smartdisplay.app.kiosk.WIDE_GRID
 import dev.smartdisplay.app.kiosk.WallpaperConfig
+import dev.smartdisplay.app.kiosk.personColors
 import dev.smartdisplay.app.ui.ambient.AmbientViewModel
 import dev.smartdisplay.app.ui.ambient.Clock
 import dev.smartdisplay.app.ui.ambient.ForecastDay
@@ -77,6 +91,8 @@ import dev.smartdisplay.app.ui.ambient.rememberNextAlarmText
 import dev.smartdisplay.app.ui.ambient.sunIsDown
 import dev.smartdisplay.app.ui.ambient.toCurrentWeather
 import dev.smartdisplay.app.ui.common.rememberMinuteClock
+import dev.smartdisplay.app.ui.controls.ControlsViewModel
+import dev.smartdisplay.app.ui.controls.ServiceCall
 import dev.smartdisplay.app.ui.theme.FamilyColor
 import dev.smartdisplay.app.ui.theme.OnPersonColor
 import dev.smartdisplay.app.ui.theme.color
@@ -104,10 +120,18 @@ fun DashboardScreen(
     onOpenAlarms: () -> Unit,
     onOpenSettings: () -> Unit,
     onDone: () -> Unit,
+    /** Home Assistant's address, for pictures it gives as paths (cameras, cover art). */
+    baseUrl: String?,
+    /** Arranging the cards: asked for with a long press (the caller checks the PIN), left with Done. */
+    editing: Boolean,
+    onEditRequest: () -> Unit,
+    onEditDone: () -> Unit,
+    onKitchenChange: (KitchenConfig) -> Unit,
     ambient: AmbientViewModel = viewModel(),
     viewModel: DashboardViewModel = viewModel(),
+    controls: ControlsViewModel = viewModel(),
 ) {
-    val weatherEntity = home.primaryWeatherEntity()
+    val weatherEntity = home.primaryWeatherEntity(kitchen.weatherEntity)
     KeepWeatherAndPhotosFresh(ambient, home, weatherEntity?.entityId, wallpaperConfig, photos = true)
     val forecastDays by ambient.forecastDays.collectAsStateWithLifecycle()
     val wallpaper by ambient.wallpaper.collectAsStateWithLifecycle()
@@ -175,16 +199,34 @@ fun DashboardScreen(
             }
         }
     }
+    var choosingWeather by remember { mutableStateOf(false) }
+    var adding by remember { mutableStateOf(false) }
+    var sourcesOf by remember { mutableStateOf<String?>(null) }
+    var shownGrid by remember { mutableStateOf(WIDE_GRID) }
+    val layout = kitchen.layout
+    val onLayoutChange = { changed: DashLayout -> onKitchenChange(kitchen.copy(layout = changed)) }
     val navButtons: @Composable () -> Unit = {
-        TextButton(onClick = onOpenControls) { Text(stringResource(R.string.dashboard_rooms)) }
-        WindDownButton()
-        TextButton(onClick = onOpenAlarms) { Text(stringResource(R.string.alarms_button)) }
-        TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_eyebrow)) }
+        if (editing) {
+            TextButton(onClick = { choosingWeather = true }) { Text(stringResource(R.string.dashboard_edit_weather)) }
+            TextButton(onClick = { adding = true }) { Text(stringResource(R.string.dashboard_edit_add)) }
+        } else {
+            TextButton(onClick = onOpenControls) { Text(stringResource(R.string.dashboard_rooms)) }
+            WindDownButton()
+            TextButton(onClick = onOpenAlarms) { Text(stringResource(R.string.alarms_button)) }
+            TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_eyebrow)) }
+        }
     }
-    // Straight to the screensaver (the clock over the photos), rather than waiting for it.
+    // Straight to the screensaver (the clock over the photos), rather than waiting for it; or, while arranging, back
+    // to the dashboard.
     val doneButton: @Composable () -> Unit = {
-        FilledTonalButton(onClick = onDone, modifier = Modifier.padding(start = 8.dp)) {
-            Text(stringResource(R.string.settings_done))
+        if (editing) {
+            Button(onClick = onEditDone, modifier = Modifier.padding(start = 8.dp)) {
+                Text(stringResource(R.string.dashboard_edit_done))
+            }
+        } else {
+            FilledTonalButton(onClick = onDone, modifier = Modifier.padding(start = 8.dp)) {
+                Text(stringResource(R.string.settings_done))
+            }
         }
     }
     // Wide: one row. Narrow: the clock and weather, then the forecast, then the buttons, each on its own line.
@@ -217,7 +259,7 @@ fun DashboardScreen(
     }
     val peopleCard: @Composable (Modifier, Boolean) -> Unit = { modifier, scroll ->
         PeopleCard(
-            people = people,
+            people = people.filterNot { it.entityId in kitchen.hiddenPeople },
             colorOf = personColor,
             kitchen = kitchen,
             runs = runs,
@@ -226,21 +268,30 @@ fun DashboardScreen(
             scroll = scroll,
         )
     }
-    val showCalendar = calendarIds.isNotEmpty()
     val calendarCard: @Composable (Modifier, Boolean) -> Unit = { modifier, bounded ->
-        CalendarCard(
-            events = shownEvents,
-            owners = owners,
-            people = household,
-            selected = selected,
-            onToggle = { viewModel.toggleOwner(it, owners.map { owner -> owner.id }) },
-            onEveryone = viewModel::showEveryone,
-            calendarName = { names[it]?.friendlyName ?: it },
-            onAssign = viewModel::assign,
-            now = now,
-            bounded = bounded,
-            modifier = modifier,
-        )
+        if (calendarIds.isEmpty()) {
+            TitledCard(stringResource(R.string.dashboard_calendar), modifier, bounded) {
+                Text(
+                    stringResource(R.string.kitchen_calendars_none),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            CalendarCard(
+                events = shownEvents,
+                owners = owners,
+                people = household,
+                selected = selected,
+                onToggle = { viewModel.toggleOwner(it, owners.map { owner -> owner.id }) },
+                onEveryone = viewModel::showEveryone,
+                calendarName = { names[it]?.friendlyName ?: it },
+                onAssign = viewModel::assign,
+                now = now,
+                bounded = bounded,
+                modifier = modifier,
+            )
+        }
     }
     val buttonsCard: @Composable (Modifier, Boolean) -> Unit = { modifier, scroll ->
         ButtonsCard(
@@ -253,15 +304,34 @@ fun DashboardScreen(
         )
     }
 
-    // The whole dashboard drifts a few pixels each minute, like the clock, so nothing sits in one place all day.
+    val onCall = { call: ServiceCall, name: String -> controls.call(call, name) }
+    val cardContent: @Composable (DashCard, Modifier, Boolean) -> Unit = { card, modifier, bounded ->
+        when (card.type) {
+            CardType.Calendar -> calendarCard(modifier, bounded)
+            CardType.People -> peopleCard(modifier, bounded)
+            CardType.Buttons -> buttonsCard(modifier, bounded)
+            CardType.Devices -> DevicesCard(card, home, onCall, modifier, bounded)
+            CardType.Sensors -> SensorsCard(card, home, modifier, bounded)
+            CardType.NowPlaying -> NowPlayingCard(card, home, baseUrl, onCall, modifier, bounded)
+            CardType.Camera -> CameraCard(card, home, baseUrl, modifier, bounded)
+        }
+    }
+
+    // The whole dashboard drifts a few pixels each minute, like the clock, so nothing sits in one place all day; but
+    // not while cards are being arranged.
     val epochMinute = now.toLocalDate().toEpochDay() * 1_440 + now.hour * 60 + now.minute
-    val (shiftX, shiftY) = burnInOffset(epochMinute)
+    val (shiftX, shiftY) = if (editing) 0 to 0 else burnInOffset(epochMinute)
     val driftX by animateDpAsState(shiftX.dp, tween(DRIFT_MS), label = "driftX")
     val driftY by animateDpAsState(shiftY.dp, tween(DRIFT_MS), label = "driftY")
 
     // The screensaver's photos behind everything, dimmed so the clock and weather read on them; the cards let them
-    // show through a little.
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    // show through a little. A long press anywhere not taken by a card's own buttons starts arranging.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .pointerInput(editing) { if (!editing) detectTapGestures(onLongPress = { onEditRequest() }) },
+    ) {
         if (photoUrl != null) {
             WallpaperBackground(photoUrl, wallpaperConfig.intervalMinutes * 60_000L, scrim = false)
             // Darkest at the top, where the clock, weather and buttons sit straight on the photo.
@@ -269,20 +339,62 @@ fun DashboardScreen(
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(dim, endY = HEADER_FADE_PX)))
         }
         CompositionLocalProvider(LocalOverPhoto provides (photoUrl != null)) {
-            DashboardLayout(header, calendarCard, peopleCard, buttonsCard, showCalendar, driftX, driftY)
+            DashboardLayout(
+                header, layout, editing, onLayoutChange, onSources = { sourcesOf = it.id }, cardContent, driftX, driftY,
+                onGrid = { shownGrid = it },
+            )
         }
+    }
+
+    if (choosingWeather) {
+        WeatherSourceDialog(kitchen, home, onKitchenChange, onDismiss = { choosingWeather = false })
+    }
+    if (adding) {
+        AddCardDialog(
+            layout = layout,
+            onAdd = { type ->
+                val name = type.name.lowercase()
+                val id = if (type.single) name else "$name-${System.currentTimeMillis()}"
+                val added = layout.add(type, id, shownGrid)
+                if (added != null) {
+                    onLayoutChange(added)
+                    adding = false
+                    // A new card of the kinds that keep their own sources starts with none: choose them now.
+                    if (!type.single) sourcesOf = id
+                }
+                added != null
+            },
+            onDismiss = { adding = false },
+        )
+    }
+    sourcesOf?.let { id -> layout.cards.firstOrNull { it.id == id } }?.let { card ->
+        CardSourcesDialog(
+            card = card,
+            kitchen = kitchen,
+            home = home,
+            onKitchenChange = onKitchenChange,
+            onCardChange = { onLayoutChange(layout.update(it)) },
+            onDismiss = { sourcesOf = null },
+        )
     }
 }
 
+/**
+ * The header, then the cards: on a [WIDE_GRID] in landscape, a [TALL_GRID] on a tablet in portrait, and on a phone
+ * stacked in the tall grid's order (top to bottom, then left to right) in a page that scrolls.
+ */
 @Composable
 private fun DashboardLayout(
     header: @Composable (wide: Boolean, clock: Dp) -> Unit,
-    calendarCard: @Composable (Modifier, Boolean) -> Unit,
-    peopleCard: @Composable (Modifier, Boolean) -> Unit,
-    buttonsCard: @Composable (Modifier, Boolean) -> Unit,
-    showCalendar: Boolean,
+    layout: DashLayout,
+    editing: Boolean,
+    onLayoutChange: (DashLayout) -> Unit,
+    onSources: (DashCard) -> Unit,
+    cardContent: @Composable (DashCard, Modifier, Boolean) -> Unit,
     driftX: Dp,
     driftY: Dp,
+    /** Told which grid is on screen, the one cards are added to first. */
+    onGrid: (Grid) -> Unit,
 ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -291,44 +403,106 @@ private fun DashboardLayout(
             .padding(horizontal = 24.dp, vertical = 16.dp)
             .offset(driftX, driftY),
     ) {
-        if (maxWidth > maxHeight && maxWidth >= 720.dp) {
-            // Bigger on taller screens: 56 dp on a phone in landscape, about 80 on a big tablet.
-            val clock = (maxHeight * 0.11f).coerceIn(56.dp, 80.dp)
+        val wide = maxWidth > maxHeight && maxWidth >= 720.dp
+        val tablet = wide || maxWidth >= 600.dp
+        val grid = if (wide) WIDE_GRID else TALL_GRID
+        SideEffect { onGrid(grid) }
+        // Bigger on bigger screens: 56 dp on a phone, up to 80 on a big tablet.
+        val clock = ((if (wide) maxHeight else maxWidth) * 0.11f).coerceIn(56.dp, 80.dp)
+        if (tablet) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                header(true, clock)
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.weight(1f)) {
-                    if (showCalendar) {
-                        calendarCard(Modifier.weight(2.6f).fillMaxHeight(), true)
-                        BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
-                            val peopleMax = maxHeight * 0.6f
-                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                // Who's home takes what it needs (its Home and Away buttons included), up to most of
-                                // the column; the buttons get the rest.
-                                peopleCard(Modifier.fillMaxWidth().heightIn(max = peopleMax), true)
-                                buttonsCard(Modifier.weight(1f).fillMaxWidth(), true)
-                            }
-                        }
-                    } else {
-                        peopleCard(Modifier.weight(1f).fillMaxHeight(), true)
-                        buttonsCard(Modifier.weight(1.3f).fillMaxHeight(), true)
-                    }
-                }
+                header(wide, clock)
+                CardGrid(
+                    layout = layout,
+                    grid = grid,
+                    editing = editing,
+                    onLayoutChange = onLayoutChange,
+                    onSources = onSources,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                ) { card, modifier -> cardContent(card, modifier, true) }
             }
         } else {
-            // A phone's width keeps 56 dp; a tablet in portrait gets up to 80.
-            val clock = (maxWidth * 0.11f).coerceIn(56.dp, 80.dp)
             Column(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
                 header(false, clock)
-                if (showCalendar) calendarCard(Modifier.fillMaxWidth(), false)
-                peopleCard(Modifier.fillMaxWidth(), false)
-                buttonsCard(Modifier.fillMaxWidth(), false)
+                if (editing) {
+                    // Arranged on the tall grid, at a height that gives its cells room.
+                    CardGrid(
+                        layout = layout,
+                        grid = TALL_GRID,
+                        editing = true,
+                        onLayoutChange = onLayoutChange,
+                        onSources = onSources,
+                        modifier = Modifier.fillMaxWidth().height(PHONE_EDIT_HEIGHT),
+                    ) { card, modifier -> cardContent(card, modifier, true) }
+                } else {
+                    layout.cards.sortedWith(compareBy({ it.tall.y }, { it.tall.x })).forEach { card ->
+                        key(card.id) { cardContent(card, Modifier.fillMaxWidth(), false) }
+                    }
+                }
             }
         }
     }
 }
+
+/** The kinds of card that can be added, and a note when the one picked has no room. */
+@Composable
+private fun AddCardDialog(layout: DashLayout, onAdd: (CardType) -> Boolean, onDismiss: () -> Unit) {
+    var full by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.dashboard_edit_add)) },
+        text = {
+            Column {
+                layout.addable().forEach { type ->
+                    TextButton(onClick = { full = !onAdd(type) }, modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Text(stringResource(type.label()), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                stringResource(type.description()),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                if (full) {
+                    Text(
+                        stringResource(R.string.dashboard_edit_full),
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+private fun CardType.label(): Int = when (this) {
+    CardType.Calendar -> R.string.dashboard_calendar
+    CardType.People -> R.string.dashboard_people
+    CardType.Buttons -> R.string.dashboard_buttons
+    CardType.Devices -> R.string.card_devices
+    CardType.Sensors -> R.string.card_sensors
+    CardType.NowPlaying -> R.string.card_now_playing
+    CardType.Camera -> R.string.card_camera
+}
+
+private fun CardType.description(): Int = when (this) {
+    CardType.Calendar -> R.string.card_calendar_about
+    CardType.People -> R.string.card_people_about
+    CardType.Buttons -> R.string.card_buttons_about
+    CardType.Devices -> R.string.card_devices_about
+    CardType.Sensors -> R.string.card_sensors_about
+    CardType.NowPlaying -> R.string.card_now_playing_about
+    CardType.Camera -> R.string.card_camera_about
+}
+
+/** How tall the tall grid is while arranging cards on a phone. */
+private val PHONE_EDIT_HEIGHT = 1_100.dp
 
 /** Whether the dashboard is over a photo, so its cards are a little see-through. */
 private val LocalOverPhoto = staticCompositionLocalOf { false }
@@ -378,7 +552,7 @@ private fun ForecastStrip(days: List<ForecastDay>, today: LocalDate) {
  * (Compose doesn't allow a scrolling view inside another scrolling the same way).
  */
 @Composable
-private fun DashCard(
+internal fun TitledCard(
     title: String,
     modifier: Modifier,
     scroll: Boolean,
@@ -412,7 +586,7 @@ private fun PeopleCard(
     modifier: Modifier,
     scroll: Boolean,
 ) {
-    DashCard(stringResource(R.string.dashboard_people), modifier, scroll) {
+    TitledCard(stringResource(R.string.dashboard_people), modifier, scroll) {
         if (people.isEmpty()) {
             Text(
                 stringResource(R.string.dashboard_no_people),
@@ -491,7 +665,7 @@ private fun ButtonsCard(
     modifier: Modifier,
     scroll: Boolean,
 ) {
-    DashCard(stringResource(R.string.dashboard_buttons), modifier, scroll) {
+    TitledCard(stringResource(R.string.dashboard_buttons), modifier, scroll) {
         if (shortcuts.isEmpty()) {
             Text(
                 stringResource(R.string.dashboard_no_buttons),

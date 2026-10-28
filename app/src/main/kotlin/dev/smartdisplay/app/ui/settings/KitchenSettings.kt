@@ -120,23 +120,15 @@ fun KitchenSettings(kitchen: KitchenConfig, home: HomeState, onChange: (KitchenC
     val calendars = remember(home.entities, home.registry) { home.calendars() }
     val people = home.people().sortedBy { it.name.lowercase() }
     val colors = personColors(people.map { it.entityId }, kitchen.personColors)
-    val familyName = stringResource(R.string.kitchen_calendar_family)
-    val hiddenName = stringResource(R.string.kitchen_calendar_hidden)
-    fun whoseName(calendarId: String): String = when {
-        calendarId in kitchen.hiddenCalendars -> hiddenName
-        else -> when (val owner = calendarOwner(calendarId, kitchen.calendarOwners, colors.keys)) {
-            FAMILY -> familyName
-            else -> nameOf(owner)
-        }
-    }
-
     Heading(stringResource(R.string.kitchen_calendars))
     if (calendars.isEmpty()) {
         PanelBody(stringResource(R.string.kitchen_calendars_none), topPadding = 2.dp)
     } else {
         PanelBody(stringResource(R.string.kitchen_calendars_body), topPadding = 2.dp)
         calendars.forEach { calendar ->
-            SettingRow(calendar.friendlyName, whoseName(calendar.entityId)) { whoseCalendar = calendar.entityId }
+            SettingRow(calendar.friendlyName, whoseCalendarName(calendar.entityId, kitchen, home)) {
+                whoseCalendar = calendar.entityId
+            }
         }
     }
 
@@ -150,34 +142,7 @@ fun KitchenSettings(kitchen: KitchenConfig, home: HomeState, onChange: (KitchenC
     }
 
     whoseCalendar?.let { calendarId ->
-        val current = when {
-            calendarId in kitchen.hiddenCalendars -> HIDDEN
-            else -> calendarOwner(calendarId, kitchen.calendarOwners, colors.keys)
-        }
-        ChoiceDialog(
-            title = stringResource(R.string.kitchen_calendar_whose, nameOf(calendarId)),
-            items = listOf(FAMILY to familyName) + people.map { it.entityId to it.name } + (HIDDEN to hiddenName),
-            selected = setOf(current),
-            multiple = false,
-            onChange = { choice, _ ->
-                onChange(
-                    kitchen.copy(
-                        hiddenCalendars = if (choice == HIDDEN) {
-                            kitchen.hiddenCalendars + calendarId
-                        } else {
-                            kitchen.hiddenCalendars - calendarId
-                        },
-                        calendarOwners = when (choice) {
-                            HIDDEN -> kitchen.calendarOwners
-                            FAMILY -> kitchen.calendarOwners - calendarId
-                            else -> kitchen.calendarOwners + (calendarId to choice)
-                        },
-                    ),
-                )
-                whoseCalendar = null
-            },
-            onDismiss = { whoseCalendar = null },
-        )
+        WhoseCalendarDialog(calendarId, kitchen, home, onChange, onDismiss = { whoseCalendar = null })
     }
     colorFor?.let { personId ->
         ColorDialog(
@@ -234,9 +199,65 @@ private enum class KitchenChoice { Buttons, Home, Away }
 /** The choice for a calendar that isn't shown, beside the family and each person. */
 private const val HIDDEN = "hidden"
 
+/** Whose a calendar is, as Settings shows it: the family's, a person's name, or not shown. */
+@Composable
+internal fun whoseCalendarName(calendarId: String, kitchen: KitchenConfig, home: HomeState): String {
+    if (calendarId in kitchen.hiddenCalendars) return stringResource(R.string.kitchen_calendar_hidden)
+    val people = home.people().map { it.entityId }
+    return when (val owner = calendarOwner(calendarId, kitchen.calendarOwners, people.toSet())) {
+        FAMILY -> stringResource(R.string.kitchen_calendar_family)
+        else -> home.entities[owner]?.friendlyName ?: owner
+    }
+}
+
+/** Chooses whose a calendar is (the family's or a person's), or that it isn't shown. */
+@Composable
+internal fun WhoseCalendarDialog(
+    calendarId: String,
+    kitchen: KitchenConfig,
+    home: HomeState,
+    onChange: (KitchenConfig) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val people = home.people().sortedBy { it.name.lowercase() }
+    val current = when {
+        calendarId in kitchen.hiddenCalendars -> HIDDEN
+        else -> calendarOwner(calendarId, kitchen.calendarOwners, people.map { it.entityId }.toSet())
+    }
+    val familyName = stringResource(R.string.kitchen_calendar_family)
+    val hiddenName = stringResource(R.string.kitchen_calendar_hidden)
+    ChoiceDialog(
+        title = stringResource(
+            R.string.kitchen_calendar_whose,
+            home.entities[calendarId]?.friendlyName ?: calendarId,
+        ),
+        items = listOf(FAMILY to familyName) + people.map { it.entityId to it.name } + (HIDDEN to hiddenName),
+        selected = setOf(current),
+        multiple = false,
+        onChange = { choice, _ ->
+            onChange(
+                kitchen.copy(
+                    hiddenCalendars = if (choice == HIDDEN) {
+                        kitchen.hiddenCalendars + calendarId
+                    } else {
+                        kitchen.hiddenCalendars - calendarId
+                    },
+                    calendarOwners = when (choice) {
+                        HIDDEN -> kitchen.calendarOwners
+                        FAMILY -> kitchen.calendarOwners - calendarId
+                        else -> kitchen.calendarOwners + (calendarId to choice)
+                    },
+                ),
+            )
+            onDismiss()
+        },
+        onDismiss = onDismiss,
+    )
+}
+
 /** A tappable row: a name, its current setting under it, and optionally that color's swatch. */
 @Composable
-private fun SettingRow(title: String, value: String, swatch: PersonColor? = null, onClick: () -> Unit) {
+internal fun SettingRow(title: String, value: String, swatch: PersonColor? = null, onClick: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier

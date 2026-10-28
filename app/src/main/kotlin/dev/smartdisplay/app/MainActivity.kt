@@ -285,12 +285,17 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
             // someone is using another screen.
             LaunchedEffect(rest) { if (screen == Screen.Ambient || screen == Screen.Dashboard) screen = rest }
             var askingPin by rememberSaveable { mutableStateOf(false) }
+            // Arranging the dashboard's cards: behind the PIN too, so anyone passing can't rearrange it.
+            var editing by rememberSaveable { mutableStateOf(false) }
+            var askingEditPin by rememberSaveable { mutableStateOf(false) }
+            LaunchedEffect(screen) { if (screen != Screen.Dashboard) editing = false }
             // The power button in a kiosk wakes the display straight back to the clock (MainActivity.onScreenOff).
             val currentRest by rememberUpdatedState(rest)
             LaunchedEffect(screenOffs) {
                 screenOffs.collect {
                     screen = currentRest
                     askingPin = false
+                    askingEditPin = false
                 }
             }
             val openSettings = { if (kiosk.hasPin) askingPin = true else screen = Screen.Settings }
@@ -310,6 +315,7 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                     onOpenControls = { screen = if (kiosk.isKitchen) Screen.Dashboard else Screen.Controls },
                     onOpenSettings = openSettings,
                     photosAtNight = kiosk.isKitchen,
+                    weatherEntity = kiosk.kitchen.weatherEntity.takeIf { kiosk.isKitchen },
                 )
                 Screen.Dashboard -> {
                     // At night the dashboard is only visited: back to the clock after a while untouched.
@@ -322,6 +328,11 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                             onOpenAlarms = { screen = Screen.Alarms },
                             onOpenSettings = openSettings,
                             onDone = { screen = Screen.Ambient },
+                            baseUrl = current.url,
+                            editing = editing,
+                            onEditRequest = { if (kiosk.hasPin) askingEditPin = true else editing = true },
+                            onEditDone = { editing = false },
+                            onKitchenChange = app.kiosk::setKitchen,
                         )
                     }
                     // Left alone, it gives way to the clock: soon at night, and by day after the screensaver time,
@@ -366,6 +377,17 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                         screen = Screen.Settings
                     },
                     onDismiss = { askingPin = false },
+                )
+            }
+            if (askingEditPin) {
+                EnterPinDialog(
+                    check = { app.checkExitPin(it) },
+                    onCorrect = {
+                        askingEditPin = false
+                        editing = true
+                    },
+                    onDismiss = { askingEditPin = false },
+                    confirmLabel = R.string.pin_arrange_dashboard,
                 )
             }
         }

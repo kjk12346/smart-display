@@ -1,0 +1,92 @@
+package dev.smartdisplay.app.kiosk
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class DashLayoutTest {
+    @Test
+    fun `the default layout fits both grids without overlaps`() {
+        val layout = DashLayout()
+        layout.cards.forEach { card ->
+            assertTrue(layout.canPlace(card.id, WIDE_GRID, card.wide))
+            assertTrue(layout.canPlace(card.id, TALL_GRID, card.tall))
+        }
+    }
+
+    @Test
+    fun `a card moves into free space, but not over another card or off the grid`() {
+        val layout = DashLayout()
+        // Buttons (9,4 3×4) up into Who's home (9,0 3×4): refused, unchanged.
+        assertSame(layout, layout.move("buttons", WIDE_GRID, CardRect(9, 2, 3, 4)))
+        assertSame(layout, layout.move("buttons", WIDE_GRID, CardRect(10, 4, 3, 4)))
+        // Shrink the calendar, then the buttons can go where it was.
+        val smaller = layout.move("calendar", WIDE_GRID, CardRect(0, 0, 6, 8))
+        val moved = smaller.move("buttons", WIDE_GRID, CardRect(6, 0, 3, 4))
+        assertEquals(CardRect(6, 0, 3, 4), moved.cards.first { it.id == "buttons" }.wide)
+        // Its portrait place is left alone.
+        assertEquals(CardRect(3, 7, 3, 5), moved.cards.first { it.id == "buttons" }.tall)
+    }
+
+    @Test
+    fun `cards can't be smaller than the minimum`() {
+        assertFalse(DashLayout().canPlace("buttons", WIDE_GRID, CardRect(9, 4, 1, 4)))
+    }
+
+    @Test
+    fun `adding finds free space, shrinking the card if it has to, and gives up when full`() {
+        val layout = DashLayout().remove("buttons")
+        val added = layout.add(CardType.Sensors, "sensors-1", WIDE_GRID)!!
+        val sensors = added.cards.first { it.id == "sensors-1" }
+        assertEquals(CardRect(9, 4, 3, 3), sensors.wide)
+        assertEquals(CardRect(3, 7, 3, 3), sensors.tall)
+        // The default layout has no room left on the grid on screen.
+        assertNull(DashLayout().add(CardType.Camera, "camera-1", WIDE_GRID))
+        assertNull(DashLayout().add(CardType.Camera, "camera-1", TALL_GRID))
+    }
+
+    @Test
+    fun `on the grid not on screen, the biggest card makes room`() {
+        val layout = DashLayout().move("calendar", WIDE_GRID, CardRect(0, 0, 6, 8))
+        val added = layout.add(CardType.Sensors, "sensors-1", WIDE_GRID)!!
+        assertEquals(CardRect(6, 0, 3, 3), added.cards.first { it.id == "sensors-1" }.wide)
+        // Portrait was full: the calendar gave up two rows, and the sensors went under it.
+        assertEquals(CardRect(0, 0, 6, 5), added.cards.first { it.id == "calendar" }.tall)
+        assertEquals(CardRect(0, 5, 3, 2), added.cards.first { it.id == "sensors-1" }.tall)
+    }
+
+    @Test
+    fun `one-of-a-kind cards can only be added back once hidden`() {
+        val layout = DashLayout()
+        assertFalse(CardType.Calendar in layout.addable())
+        assertTrue(CardType.Calendar in layout.remove("calendar").addable())
+        assertTrue(CardType.Sensors in layout.addable())
+    }
+
+    @Test
+    fun `the layout survives saving`() {
+        val layout = DashLayout().remove("buttons").add(CardType.Devices, "devices-1", WIDE_GRID)!!.let { added ->
+            added.update(added.cards.last().copy(areaId = "kitchen", entities = listOf("light.a", "switch.b")))
+        }
+        assertEquals(layout, decodeLayout(encodeLayout(layout)))
+    }
+
+    @Test
+    fun `damaged saved layouts fall back, and bad cards are dropped`() {
+        assertNull(decodeLayout(null))
+        assertNull(decodeLayout("not json"))
+        val text = """[
+            {"id": "calendar", "type": "Calendar", "wide": [0, 0, 9, 8], "tall": [0, 0, 6, 7]},
+            {"id": "x", "type": "Hologram", "wide": [9, 0, 3, 4], "tall": [0, 7, 3, 5]},
+            {"id": "over", "type": "Sensors", "wide": [8, 0, 3, 4], "tall": [0, 7, 3, 5]},
+            {"id": "calendar2", "type": "Calendar", "wide": [9, 0, 3, 4], "tall": [0, 7, 3, 5]},
+            {"id": "ok", "type": "Sensors", "wide": [9, 0, 3, 4], "tall": [0, 7, 3, 5], "entities": ["sensor.t"]}
+        ]"""
+        val layout = decodeLayout(text)!!
+        assertEquals(listOf("calendar", "ok"), layout.cards.map { it.id })
+        assertEquals(listOf("sensor.t"), layout.cards.last().entities)
+    }
+}
