@@ -85,18 +85,37 @@ data class DashLayout(val cards: List<DashCard> = DEFAULT_CARDS) {
      */
     fun add(type: CardType, id: String): DashLayout? {
         val (wideSize, tallSize) = DEFAULT_SIZES.getValue(type)
+        val (afterWide, wide) = makeRoom(WIDE_GRID, wideSize) ?: return null
+        val (afterTall, tall) = afterWide.makeRoom(TALL_GRID, tallSize) ?: return null
+        return afterTall.copy(cards = afterTall.cards + DashCard(id, type, wide, tall))
+    }
+
+    /**
+     * The cards on [grid] back as they started: the calendar, Who's home and Buttons where they first were, and every
+     * other card fitted in around them, as when it was added. Hidden cards stay hidden, and the other grid is left as
+     * it is. Unchanged in the unlikely case the added cards no longer fit.
+     */
+    fun reset(grid: Grid): DashLayout {
+        val defaults = DEFAULT_CARDS.associateBy { it.id }
+        val (original, added) = cards.partition { it.id in defaults }
+        var layout = copy(cards = original.map { it.withRect(grid, defaults.getValue(it.id).rect(grid)) })
+        for (card in added) {
+            val (wideSize, tallSize) = DEFAULT_SIZES.getValue(card.type)
+            val (roomy, rect) = layout.makeRoom(grid, if (grid == WIDE_GRID) wideSize else tallSize) ?: return this
+            layout = roomy.copy(cards = roomy.cards + card.withRect(grid, rect))
+        }
+        // In the order they were, which is the order they're drawn.
+        val placed = layout.cards.associateBy { it.id }
+        return copy(cards = cards.map { placed.getValue(it.id) })
+    }
+
+    /** Space on [grid] for a card [size] big, shrinking the biggest cards until there is; null if none is left. */
+    private fun makeRoom(grid: Grid, size: Pair<Int, Int>): Pair<DashLayout, CardRect>? {
         var layout = this
-        var wide = layout.freeSpot(WIDE_GRID, wideSize)
-        while (wide == null) {
-            layout = layout.shrinkBiggest(WIDE_GRID) ?: return null
-            wide = layout.freeSpot(WIDE_GRID, wideSize)
+        while (true) {
+            layout.freeSpot(grid, size)?.let { return layout to it }
+            layout = layout.shrinkBiggest(grid) ?: return null
         }
-        var tall = layout.freeSpot(TALL_GRID, tallSize)
-        while (tall == null) {
-            layout = layout.shrinkBiggest(TALL_GRID) ?: return null
-            tall = layout.freeSpot(TALL_GRID, tallSize)
-        }
-        return layout.copy(cards = layout.cards + DashCard(id, type, wide, tall))
     }
 
     /**

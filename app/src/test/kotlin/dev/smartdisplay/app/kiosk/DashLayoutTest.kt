@@ -75,6 +75,32 @@ class DashLayoutTest {
     }
 
     @Test
+    fun `resetting puts one grid's cards back as they started`() {
+        val moved = DashLayout()
+            .move("calendar", WIDE_GRID, CardRect(0, 0, 6, 8))
+            .move("buttons", WIDE_GRID, CardRect(6, 4, 3, 4))
+            .move("people", TALL_GRID, CardRect(0, 7, 2, 5))
+        val reset = moved.reset(WIDE_GRID)
+        assertEquals(DashLayout().cards.map { it.wide }, reset.cards.map { it.wide })
+        // Portrait keeps its own arrangement.
+        assertEquals(moved.cards.map { it.tall }, reset.cards.map { it.tall })
+    }
+
+    @Test
+    fun `resetting fits added cards in around the first three`() {
+        val layout = DashLayout().add(CardType.Sensors, "sensors-1")!!
+            .move("calendar", WIDE_GRID, CardRect(0, 0, 5, 6))
+        val reset = layout.reset(WIDE_GRID)
+        assertEquals(listOf("calendar", "people", "buttons", "sensors-1"), reset.cards.map { it.id })
+        assertEquals(CardRect(9, 0, 3, 4), reset.cards.first { it.id == "people" }.wide)
+        assertTrue(reset.cards.all { it.wide.fits(WIDE_GRID) })
+        reset.cards.forEach { a ->
+            reset.cards.filter { it !== a }.forEach { b -> assertFalse(a.wide.overlaps(b.wide)) }
+        }
+        assertEquals(layout.cards.map { it.tall }, reset.cards.map { it.tall })
+    }
+
+    @Test
     fun `the layout survives saving`() {
         val layout = DashLayout().remove("buttons").add(CardType.Devices, "devices-1")!!.let { added ->
             added.update(added.cards.last().copy(areaId = "kitchen", entities = listOf("light.a", "switch.b")))

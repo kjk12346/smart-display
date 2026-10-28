@@ -32,6 +32,8 @@ data class KitchenConfig(
     val hiddenPeople: Set<String> = emptySet(),
     /** The weather shown on the dashboard and the clock; null for the first weather entity. */
     val weatherEntity: String? = null,
+    /** Sensors, doors, locks and the like shown as chips across the top of the dashboard, in this order. */
+    val statusEntities: List<String> = emptyList(),
 )
 
 const val DEFAULT_SCREENSAVER_MINUTES = 10

@@ -70,6 +70,7 @@ import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.kiosk.CardType
 import dev.smartdisplay.app.kiosk.DashCard
 import dev.smartdisplay.app.kiosk.DashLayout
+import dev.smartdisplay.app.kiosk.Grid
 import dev.smartdisplay.app.kiosk.KitchenConfig
 import dev.smartdisplay.app.kiosk.TALL_GRID
 import dev.smartdisplay.app.kiosk.WIDE_GRID
@@ -198,14 +199,19 @@ fun DashboardScreen(
         }
     }
     var choosingWeather by remember { mutableStateOf(false) }
+    var choosingStatus by remember { mutableStateOf(false) }
+    var resetting by remember { mutableStateOf<Grid?>(null) }
     var adding by remember { mutableStateOf(false) }
     var sourcesOf by remember { mutableStateOf<String?>(null) }
     val layout = kitchen.layout
     val onLayoutChange = { changed: DashLayout -> onKitchenChange(kitchen.copy(layout = changed)) }
-    val navButtons: @Composable () -> Unit = {
+    // While arranging, Reset puts back the cards of the grid on screen.
+    val navButtons: @Composable (grid: Grid) -> Unit = { grid ->
         if (editing) {
             TextButton(onClick = { choosingWeather = true }) { Text(stringResource(R.string.dashboard_edit_weather)) }
+            TextButton(onClick = { choosingStatus = true }) { Text(stringResource(R.string.dashboard_edit_status)) }
             TextButton(onClick = { adding = true }) { Text(stringResource(R.string.dashboard_edit_add)) }
+            TextButton(onClick = { resetting = grid }) { Text(stringResource(R.string.dashboard_edit_reset)) }
         } else {
             TextButton(onClick = onOpenControls) { Text(stringResource(R.string.dashboard_rooms)) }
             WindDownButton()
@@ -226,17 +232,26 @@ fun DashboardScreen(
             }
         }
     }
-    // Wide: one row. Narrow: the clock and weather, then the forecast, then the buttons, each on its own line.
+    val statusChips = home.statusChips(kitchen.statusEntities)
+    // Wide: one row, with the status chips under the weather. Narrow: the clock and weather, then the forecast, the
+    // status chips and the buttons, each on its own line.
     val header: @Composable (wide: Boolean, clock: Dp) -> Unit = { wide, clock ->
         if (wide) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Clock(now, nextAlarm, size = clock, alignment = Alignment.Start)
-                Spacer(Modifier.weight(1f))
-                currentWeather()
-                ForecastStrip(days, today = now.toLocalDate())
-                Spacer(Modifier.weight(1f))
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        currentWeather()
+                        ForecastStrip(days, today = now.toLocalDate())
+                    }
+                    if (statusChips.isNotEmpty()) StatusBar(statusChips)
+                }
                 // Two by two, so a fourth button (Wind down) doesn't make the header taller.
-                FlowRow(maxItemsInEachRow = 2, horizontalArrangement = Arrangement.End) { navButtons() }
+                FlowRow(maxItemsInEachRow = 2, horizontalArrangement = Arrangement.End) { navButtons(WIDE_GRID) }
                 doneButton()
             }
         } else {
@@ -247,8 +262,9 @@ fun DashboardScreen(
                     currentWeather()
                 }
                 ForecastStrip(days, today = now.toLocalDate())
+                if (statusChips.isNotEmpty()) StatusBar(statusChips)
                 FlowRow(verticalArrangement = Arrangement.Center) {
-                    navButtons()
+                    navButtons(TALL_GRID)
                     doneButton()
                 }
             }
@@ -344,6 +360,29 @@ fun DashboardScreen(
 
     if (choosingWeather) {
         WeatherSourceDialog(kitchen, home, onKitchenChange, onDismiss = { choosingWeather = false })
+    }
+    if (choosingStatus) {
+        StatusSourcesDialog(kitchen, home, onKitchenChange, onDismiss = { choosingStatus = false })
+    }
+    resetting?.let { grid ->
+        AlertDialog(
+            onDismissRequest = { resetting = null },
+            title = { Text(stringResource(R.string.dashboard_reset_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        if (grid == WIDE_GRID) R.string.dashboard_reset_wide_body else R.string.dashboard_reset_tall_body,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onLayoutChange(layout.reset(grid))
+                    resetting = null
+                }) { Text(stringResource(R.string.dashboard_reset_confirm)) }
+            },
+            dismissButton = { TextButton(onClick = { resetting = null }) { Text(stringResource(R.string.cancel)) } },
+        )
     }
     if (adding) {
         AddCardDialog(

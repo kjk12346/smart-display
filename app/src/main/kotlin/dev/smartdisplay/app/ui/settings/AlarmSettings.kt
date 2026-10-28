@@ -171,7 +171,7 @@ fun AlarmSettings(home: HomeState, browse: suspend (String) -> MediaFolder) {
 
 private enum class Choosing { Lights, Speaker, Sound }
 
-/** Ticks entities from a list: several ([multiple]) or one. */
+/** Ticks entities from a list: several ([multiple]) or one, under an optional [note]. */
 @Composable
 internal fun ChoiceDialog(
     title: String,
@@ -180,12 +180,23 @@ internal fun ChoiceDialog(
     multiple: Boolean,
     onChange: (id: String, selected: Boolean) -> Unit,
     onDismiss: () -> Unit,
+    note: String? = null,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
             LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                if (note != null) {
+                    item(key = "note") {
+                        Text(
+                            note,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
+                }
                 items(items, key = { it.first }) { (id, name) ->
                     val checked = id in selected
                     Row(

@@ -77,6 +77,7 @@ class KioskStore(context: Context) {
         putString(KEY_KITCHEN_LAYOUT, encodeLayout(kitchen.layout))
         putStringSet(KEY_KITCHEN_HIDDEN_PEOPLE, kitchen.hiddenPeople)
         putString(KEY_KITCHEN_WEATHER, kitchen.weatherEntity)
+        putString(KEY_KITCHEN_STATUS, encodeIds(kitchen.statusEntities))
     }
 
     fun setPin(pin: String) {
@@ -145,6 +146,7 @@ class KioskStore(context: Context) {
             layout = decodeLayout(prefs.getString(KEY_KITCHEN_LAYOUT, null)) ?: DashLayout(),
             hiddenPeople = prefs.getStringSet(KEY_KITCHEN_HIDDEN_PEOPLE, null)?.toSet().orEmpty(),
             weatherEntity = prefs.getString(KEY_KITCHEN_WEATHER, null),
+            statusEntities = decodeIds(prefs.getString(KEY_KITCHEN_STATUS, null)),
         ),
     )
 
@@ -173,6 +175,7 @@ class KioskStore(context: Context) {
         const val KEY_KITCHEN_LAYOUT = "kitchen_layout"
         const val KEY_KITCHEN_HIDDEN_PEOPLE = "kitchen_hidden_people"
         const val KEY_KITCHEN_WEATHER = "kitchen_weather"
+        const val KEY_KITCHEN_STATUS = "kitchen_status"
     }
 }
 

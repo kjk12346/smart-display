@@ -69,4 +69,38 @@ class CardModelsTest {
         assertNull(absoluteUrl("http://ha", null))
         assertNull(absoluteUrl(null, path))
     }
+
+    @Test
+    fun `the status bar shows sensors always, and doors and locks only when they need a look`() {
+        val door = """{"friendly_name":"Back door","device_class":"door"}"""
+        val smoke = """{"friendly_name":"Smoke","device_class":"smoke"}"""
+        val home = HomeState(
+            entities = listOf(
+                entity("sensor.water", "45", """{"friendly_name":"Hot water","unit_of_measurement":"°C"}"""),
+                entity("binary_sensor.door_open", "on", door),
+                entity("binary_sensor.door_shut", "off", door),
+                entity("binary_sensor.smoke", "on", smoke),
+                entity("lock.front", "locked"),
+                entity("lock.back", "unlocked"),
+                entity("lock.side", "jammed"),
+                entity("cover.garage", "open"),
+                entity("cover.blind", "closed"),
+                entity("alarm_control_panel.home", "armed_away"),
+                entity("sensor.gone", "unavailable"),
+            ).associateBy { it.entityId },
+        )
+        val chips = home.statusChips(home.entities.keys.toList() + "sensor.missing")
+        assertEquals(
+            listOf(
+                StatusChip("sensor.water", "Hot water", value = "45 °C"),
+                StatusChip("binary_sensor.door_open", "Back door", word = StatusWord.Open),
+                StatusChip("binary_sensor.smoke", "Smoke", word = StatusWord.Detected, alert = true),
+                StatusChip("lock.back", "lock.back", word = StatusWord.Unlocked),
+                StatusChip("lock.side", "lock.side", word = StatusWord.Jammed, alert = true),
+                StatusChip("cover.garage", "cover.garage", word = StatusWord.Open),
+                StatusChip("alarm_control_panel.home", "alarm_control_panel.home", word = StatusWord.ArmedAway),
+            ),
+            chips,
+        )
+    }
 }
