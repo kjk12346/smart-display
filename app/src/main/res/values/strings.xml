@@ -235,6 +235,11 @@
     <string name="wallpaper_folder">Photos from “%1$s”, shuffled. Plain black at night.</string>
     <string name="wallpaper_choose">Choose folder</string>
     <string name="wallpaper_remove">Remove</string>
+    <string name="wallpaper_clock">Clock over the photos</string>
+    <string name="wallpaper_clock_corner">In a corner, like a photo frame</string>
+    <string name="wallpaper_clock_middle">In the middle</string>
+    <string name="wallpaper_photo_info">Where and when each photo was taken</string>
+    <string name="wallpaper_photo_info_description">In the other corner, from the photo\'s own details. Places need a photo with its location and a tablet that can look up place names (not Fire tablets).</string>
     <string name="wallpaper_interval">Change photo every</string>
     <string name="media_title">Media</string>
     <string name="media_up">‹ Back</string>

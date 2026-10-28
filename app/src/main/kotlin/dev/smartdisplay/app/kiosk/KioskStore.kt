@@ -65,6 +65,8 @@ class KioskStore(context: Context) {
         putString(KEY_WALLPAPER_FOLDER, wallpaper.folderId)
         putString(KEY_WALLPAPER_TITLE, wallpaper.folderTitle)
         putInt(KEY_WALLPAPER_INTERVAL, wallpaper.intervalMinutes)
+        putBoolean(KEY_WALLPAPER_CORNER, wallpaper.clockCorner)
+        putBoolean(KEY_WALLPAPER_INFO, wallpaper.photoInfo)
     }
 
     fun setKitchen(kitchen: KitchenConfig) = update {
@@ -142,6 +144,8 @@ class KioskStore(context: Context) {
             folderId = prefs.getString(KEY_WALLPAPER_FOLDER, null),
             folderTitle = prefs.getString(KEY_WALLPAPER_TITLE, null),
             intervalMinutes = prefs.getInt(KEY_WALLPAPER_INTERVAL, 5),
+            clockCorner = prefs.getBoolean(KEY_WALLPAPER_CORNER, true),
+            photoInfo = prefs.getBoolean(KEY_WALLPAPER_INFO, true),
         ),
         kitchen = KitchenConfig(
             shortcuts = decodeIds(prefs.getString(KEY_KITCHEN_SHORTCUTS, null)),
@@ -184,6 +188,8 @@ class KioskStore(context: Context) {
         const val KEY_WALLPAPER_FOLDER = "wallpaper_folder"
         const val KEY_WALLPAPER_TITLE = "wallpaper_title"
         const val KEY_WALLPAPER_INTERVAL = "wallpaper_interval"
+        const val KEY_WALLPAPER_CORNER = "wallpaper_clock_corner"
+        const val KEY_WALLPAPER_INFO = "wallpaper_photo_info"
         const val KEY_KITCHEN_SHORTCUTS = "kitchen_shortcuts"
         const val KEY_KITCHEN_HOME = "kitchen_home"
         const val KEY_KITCHEN_AWAY = "kitchen_away"

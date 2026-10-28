@@ -336,6 +336,32 @@ private fun DisplaySettings(kiosk: KioskConfig, viewModel: SettingsViewModel, on
                 )
             }
         }
+        PanelBody(stringResource(R.string.wallpaper_clock), topPadding = 12.dp)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .horizontalScroll(rememberScrollState()),
+        ) {
+            FilterChip(
+                selected = wallpaper.clockCorner,
+                onClick = { viewModel.setClockCorner(true) },
+                label = { Text(stringResource(R.string.wallpaper_clock_corner)) },
+            )
+            FilterChip(
+                selected = !wallpaper.clockCorner,
+                onClick = { viewModel.setClockCorner(false) },
+                label = { Text(stringResource(R.string.wallpaper_clock_middle)) },
+            )
+        }
+        if (wallpaper.clockCorner) {
+            SwitchRow(
+                title = stringResource(R.string.wallpaper_photo_info),
+                description = stringResource(R.string.wallpaper_photo_info_description),
+                checked = wallpaper.photoInfo,
+                onCheckedChange = viewModel::setPhotoInfo,
+            )
+        }
     }
 }
 

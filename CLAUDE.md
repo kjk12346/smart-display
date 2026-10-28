@@ -31,6 +31,15 @@ Home Assistant.
   crossfade, under a dark gradient; plain black in quiet hours. Only images directly in the folder, not subfolders.
   The folder is listed again at each round's start and every 10 minutes; added photos join the current round. Each
   photo slowly pans and zooms (`PanZoom`, 1.05–1.15×, over its interval clamped to 20 s–2 min, then eases back).
+- **Photo-frame clock (added 2026-10-28):** over photos the clock sits in a corner like a Nest Hub's (Settings >
+  Display: "In a corner" by default, or "In the middle"): today's date, the time with the weather's icon and
+  temperature, and the next alarm, bottom left; where and when the photo was taken bottom right (top right in
+  portrait, where above the clock it read like today's date). Only the edges with text darken. Without photos, or
+  during a sunrise, the clock goes back to the middle. Place and date come from the photo's EXIF
+  (`ui/ambient/PhotoInfo.kt`), read from Coil's disk cache or else the photo's first 256 KB; the place is named by
+  Android's `Geocoder` (town and state at home, town and country abroad), so not on Fire tablets. Can be turned off.
+  Checked on the 15.6" tablet (landscape) and the Pixel (portrait) with the owner's photos, which have dates but no
+  GPS (camera files), so a named place hasn't been seen on screen yet.
 - **Google Photos (planned, owner decided yes):** only via Google's Photos Picker API (since March 2025 apps can't
   read albums); the app keeps copies of picked photos, and new album photos don't appear by themselves. Needs the
   owner's Google Cloud project + Android OAuth client, and Google Play services (so not on Fire tablets). Until

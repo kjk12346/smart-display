@@ -16,6 +16,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,9 +25,11 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -37,6 +40,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -46,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -71,9 +76,11 @@ import dev.smartdisplay.app.kiosk.WallpaperConfig
 import dev.smartdisplay.app.ui.common.ScreenBrightness
 import dev.smartdisplay.app.ui.common.rememberMinuteClock
 import dev.smartdisplay.app.ui.theme.SmartDisplayTheme
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAccessor
 import java.util.Locale
 import kotlinx.coroutines.delay
 
@@ -126,14 +133,16 @@ fun AmbientScreen(
     )
 
     val wallpaper by viewModel.wallpaper.collectAsStateWithLifecycle()
-    val wallpaperUrl = wallpaper?.takeIf { photos && it.folderId == wallpaperConfig.folderId }?.url
+    val shown = wallpaper?.takeIf { photos && it.folderId == wallpaperConfig.folderId }
     val nextAlarm = rememberNextAlarmText(now)
     val context = LocalContext.current
 
     AmbientContent(
         now = now,
-        wallpaperUrl = wallpaperUrl,
+        wallpaperUrl = shown?.url,
         wallpaperIntervalMillis = wallpaperConfig.intervalMinutes * 60_000L,
+        clockCorner = wallpaperConfig.clockCorner,
+        photoInfo = shown?.info?.takeIf { wallpaperConfig.photoInfo },
         nextAlarm = nextAlarm,
         weather = weather,
         forecast = forecast?.takeIf { it.first == weather?.entityId }?.second,
@@ -203,7 +212,12 @@ private fun AmbientContent(
     loaded: Boolean,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
+    clockCorner: Boolean = false,
+    photoInfo: PhotoInfo? = null,
 ) {
+    // Like a photo frame: the clock in a corner, the photo's place and date in another. Only over a photo, and not
+    // during a sunrise, whose "I'm up" button wants the middle of the screen.
+    val corner = clockCorner && wallpaperUrl != null && sunrise == null
     val epochMinute = now.toLocalDate().toEpochDay() * 1_440 + now.hour * 60 + now.minute
     val (shiftX, shiftY) = burnInOffset(epochMinute)
     val offsetX by animateDpAsState(shiftX.dp, tween(DRIFT_MS), label = "driftX")
@@ -218,46 +232,51 @@ private fun AmbientContent(
                 detectTapGestures(onTap = { onTap() }, onLongPress = { onLongPress() })
             },
     ) {
-        if (wallpaperUrl != null) WallpaperBackground(wallpaperUrl, wallpaperIntervalMillis)
-        if (sunrise != null) SunriseGlow(sunrise)
         val landscape = maxWidth > maxHeight
-        // The clock's digit height drives everything else's size. Capped, so a big tablet's clock isn't overwhelming.
-        val fit = if (landscape) minOf(maxHeight * 0.30f, maxWidth * 0.15f) else minOf(maxWidth * 0.26f, maxHeight * 0.15f)
-        val clock = minOf(fit, 150.dp)
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset { IntOffset(offsetX.roundToPx(), offsetY.roundToPx()) }
-                .graphicsLayer { alpha = contentAlpha },
-        ) {
-            // On the bright sunrise glow, the softer greys and lavender would fade into it: use the main text colour.
-            val colors = MaterialTheme.colorScheme
-            val readable = if (sunrise == null) colors else colors.copy(
-                onSurfaceVariant = colors.onBackground.copy(alpha = 0.9f),
-                tertiary = colors.onBackground,
-            )
-            MaterialTheme(colorScheme = readable, typography = MaterialTheme.typography, shapes = MaterialTheme.shapes) {
-                if (landscape) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(clock * 0.6f),
-                    ) {
-                        Clock(now, nextAlarm, clock, Alignment.Start)
-                        if (weather != null) Weather(weather, forecast, night, clock)
-                    }
-                } else {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(clock * 0.45f),
-                    ) {
-                        Clock(now, nextAlarm, clock, Alignment.CenterHorizontally)
-                        if (weather != null) Weather(weather, forecast, night, clock)
-                    }
-                }
-            }
+        if (wallpaperUrl != null) {
+            WallpaperBackground(wallpaperUrl, wallpaperIntervalMillis, scrim = !corner)
+            // In a corner, only the edges with text darken: more of the photo shows.
+            if (corner) Box(Modifier.fillMaxSize().background(if (landscape) CORNER_SCRIM else CORNER_SCRIM_TALL))
         }
-
+        if (sunrise != null) SunriseGlow(sunrise)
+        if (corner) {
+            val width = maxWidth
+            val fitCorner = if (landscape) {
+                minOf(maxHeight * 0.17f, width * 0.09f)
+            } else {
+                minOf(width * 0.2f, maxHeight * 0.1f)
+            }
+            val size = minOf(fitCorner, CORNER_CLOCK_MAX)
+            val margin = maxOf(24.dp, size * 0.4f)
+            val drift = Modifier
+                .offset { IntOffset(offsetX.roundToPx(), offsetY.roundToPx()) }
+                .graphicsLayer { alpha = contentAlpha }
+            // A soft shadow keeps white text readable on a bright patch of photo.
+            CompositionLocalProvider(LocalTextStyle provides LocalTextStyle.current.copy(shadow = TEXT_SHADOW)) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(margin)
+                        .then(drift),
+                ) {
+                    CornerClock(now, nextAlarm, weather, night, size)
+                }
+                // Portrait has no room beside the clock, and right above it the photo's date would read like
+                // today's: the photo's details go to the top corner instead.
+                PhotoCaption(
+                    photoInfo,
+                    size,
+                    Alignment.End,
+                    Modifier
+                        .align(if (landscape) Alignment.BottomEnd else Alignment.TopEnd)
+                        .padding(margin)
+                        .widthIn(max = width * if (landscape) 0.38f else 0.7f)
+                        .then(drift),
+                )
+            }
+        } else {
+            CenteredClock(landscape, now, nextAlarm, weather, forecast, night, sunrise, offsetX, offsetY, contentAlpha)
+        }
         val hint = when {
             status is ConnectionStatus.Waiting -> R.string.ambient_reconnecting
             status == ConnectionStatus.Connecting && !loaded -> R.string.live_connecting
@@ -266,9 +285,11 @@ private fun AmbientContent(
         }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 24.dp),
+            modifier = if (corner) {
+                Modifier.align(Alignment.TopCenter).padding(top = 24.dp)
+            } else {
+                Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)
+            },
         ) {
             if (sunrise != null) {
                 // During a sunrise: when it rings, and a way to say "I'm up" (skips this ring).
@@ -295,6 +316,57 @@ private fun AmbientContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.graphicsLayer { alpha = contentAlpha * 0.8f },
                 )
+            }
+        }
+    }
+}
+
+/** The clock and weather in the middle of the screen, side by side in landscape and stacked in portrait. */
+@Composable
+private fun BoxWithConstraintsScope.CenteredClock(
+    landscape: Boolean,
+    now: LocalDateTime,
+    nextAlarm: String?,
+    weather: CurrentWeather?,
+    forecast: DailyForecast?,
+    night: Boolean,
+    sunrise: Float?,
+    offsetX: Dp,
+    offsetY: Dp,
+    contentAlpha: Float,
+) {
+    // The clock's digit height drives everything else's size. Capped, so a big tablet's clock isn't overwhelming.
+    val fit = if (landscape) minOf(maxHeight * 0.30f, maxWidth * 0.15f) else minOf(maxWidth * 0.26f, maxHeight * 0.15f)
+    val clock = minOf(fit, 150.dp)
+    Box(
+        modifier = Modifier
+            .align(Alignment.Center)
+            .offset { IntOffset(offsetX.roundToPx(), offsetY.roundToPx()) }
+            .graphicsLayer { alpha = contentAlpha },
+    ) {
+        // On the bright sunrise glow, the softer greys and lavender would fade into it: use the main text colour.
+        val colors = MaterialTheme.colorScheme
+        val readable = if (sunrise == null) colors else colors.copy(
+            onSurfaceVariant = colors.onBackground.copy(alpha = 0.9f),
+            tertiary = colors.onBackground,
+        )
+        MaterialTheme(colorScheme = readable, typography = MaterialTheme.typography, shapes = MaterialTheme.shapes) {
+            if (landscape) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(clock * 0.6f),
+                ) {
+                    Clock(now, nextAlarm, clock, Alignment.Start)
+                    if (weather != null) Weather(weather, forecast, night, clock)
+                }
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(clock * 0.45f),
+                ) {
+                    Clock(now, nextAlarm, clock, Alignment.CenterHorizontally)
+                    if (weather != null) Weather(weather, forecast, night, clock)
+                }
             }
         }
     }
@@ -390,39 +462,74 @@ internal fun WallpaperBackground(url: String, intervalMillis: Long, scrim: Boole
 
 private val SCRIM = Color.Black
 
+/** Over a photo with the clock in a corner: light at the top, darker along the bottom where the text sits. */
+private val CORNER_SCRIM = Brush.verticalGradient(
+    0f to SCRIM.copy(alpha = 0.1f),
+    0.5f to SCRIM.copy(alpha = 0.12f),
+    1f to SCRIM.copy(alpha = 0.6f),
+)
+
+/** The same in portrait, where the photo's details are at the top. */
+private val CORNER_SCRIM_TALL = Brush.verticalGradient(
+    0f to SCRIM.copy(alpha = 0.45f),
+    0.15f to SCRIM.copy(alpha = 0.12f),
+    0.6f to SCRIM.copy(alpha = 0.12f),
+    1f to SCRIM.copy(alpha = 0.6f),
+)
+
+private val TEXT_SHADOW = Shadow(SCRIM.copy(alpha = 0.6f), blurRadius = 12f)
+
+/** The corner clock's digit height, at most. */
+private val CORNER_CLOCK_MAX = 110.dp
+
+/** The time (without its AM/PM marker), the marker (null on a 24-hour clock) and the date, in the device's style. */
+private data class ClockText(val time: String, val marker: String?, val date: String)
+
 @Composable
-internal fun Clock(now: LocalDateTime, nextAlarm: String?, size: Dp, alignment: Alignment.Horizontal) {
+private fun clockText(now: LocalDateTime): ClockText {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
     val use24Hour = DateFormat.is24HourFormat(context)
     val timePattern = DateFormat.getBestDateTimePattern(locale, if (use24Hour) "Hm" else "hm")
-    // The AM/PM marker is shown smaller, next to the digits.
-    val time = format(now, timePattern.replace("a", "").trim(), locale, fallback = if (use24Hour) "H:mm" else "h:mm")
-    val marker = if (use24Hour) null else format(now, "a", locale, fallback = "a")
-    val date = format(now, DateFormat.getBestDateTimePattern(locale, "EEEEMMMMd"), locale, fallback = "EEEE, MMMM d")
+    return ClockText(
+        time = format(now, timePattern.replace("a", "").trim(), locale, fallback = if (use24Hour) "H:mm" else "h:mm"),
+        marker = if (use24Hour) null else format(now, "a", locale, fallback = "a"),
+        date = format(now, DateFormat.getBestDateTimePattern(locale, "EEEEMMMMd"), locale, fallback = "EEEE, MMMM d"),
+    )
+}
 
-    Column(horizontalAlignment = alignment) {
-        Row {
+/** The time in large digits, with the AM/PM marker smaller beside them. */
+@Composable
+private fun Time(text: ClockText, size: Dp) {
+    Row {
+        Text(
+            text = text.time,
+            fontSize = size.asTextSize(),
+            lineHeight = size.asTextSize(),
+            fontWeight = FontWeight.Light,
+            letterSpacing = (-0.02).em,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.alignByBaseline(),
+        )
+        if (text.marker != null) {
             Text(
-                text = time,
-                fontSize = size.asTextSize(),
-                lineHeight = size.asTextSize(),
-                fontWeight = FontWeight.Light,
-                letterSpacing = (-0.02).em,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.alignByBaseline(),
+                text = text.marker,
+                fontSize = (size * 0.2f).asTextSize(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .alignByBaseline()
+                    .padding(start = size * 0.08f),
             )
-            if (marker != null) {
-                Text(
-                    text = marker,
-                    fontSize = (size * 0.2f).asTextSize(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .alignByBaseline()
-                        .padding(start = size * 0.08f),
-                )
-            }
         }
+    }
+}
+
+@Composable
+internal fun Clock(now: LocalDateTime, nextAlarm: String?, size: Dp, alignment: Alignment.Horizontal) {
+    val text = clockText(now)
+    val date = text.date
+    Column(horizontalAlignment = alignment) {
+        Time(text, size)
         Text(
             text = date,
             fontSize = (size * 0.17f).asTextSize(),
@@ -439,6 +546,83 @@ internal fun Clock(now: LocalDateTime, nextAlarm: String?, size: Dp, alignment: 
         }
     }
 }
+
+/**
+ * The photo-frame clock: the date over the time, the weather's icon and temperature beside it, and the next alarm
+ * under it. Smaller than the centred clock, so the photo is what's seen.
+ */
+@Composable
+private fun CornerClock(now: LocalDateTime, nextAlarm: String?, weather: CurrentWeather?, night: Boolean, size: Dp) {
+    val text = clockText(now)
+    Column {
+        Text(
+            text = text.date,
+            fontSize = (size * 0.22f).asTextSize(),
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f),
+            modifier = Modifier.padding(bottom = size * 0.04f),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Time(text, size)
+            if (weather != null) {
+                WeatherIcon(
+                    weather.condition,
+                    night,
+                    size = size * 0.6f,
+                    modifier = Modifier.padding(start = size * 0.4f, end = size * 0.12f),
+                )
+                Text(
+                    text = weather.temperature?.let(::formatTemperature) ?: "–",
+                    fontSize = (size * 0.5f).asTextSize(),
+                    fontWeight = FontWeight.Light,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+            }
+        }
+        if (nextAlarm != null) {
+            Text(
+                text = stringResource(R.string.alarms_next, nextAlarm),
+                fontSize = (size * 0.18f).asTextSize(),
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.padding(top = size * 0.06f),
+            )
+        }
+    }
+}
+
+/**
+ * Where and when the photo was taken ("Lisbon, Portugal" over "June 14, 2019"), fading with its photo. Nothing
+ * for a photo without either.
+ */
+@Composable
+private fun PhotoCaption(info: PhotoInfo?, size: Dp, alignment: Alignment.Horizontal, modifier: Modifier = Modifier) {
+    val locale = LocalConfiguration.current.locales[0]
+    Crossfade(targetState = info, animationSpec = tween(1_500), modifier = modifier, label = "photoInfo") { shown ->
+        if (shown != null) {
+            val textAlign = if (alignment == Alignment.End) TextAlign.End else TextAlign.Start
+            Column(horizontalAlignment = alignment) {
+                if (shown.place != null) {
+                    Text(
+                        text = shown.place,
+                        fontSize = (size * 0.24f).asTextSize(),
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = textAlign,
+                    )
+                }
+                if (shown.taken != null) {
+                    Text(
+                        text = formatPhotoDate(shown.taken, locale),
+                        fontSize = (size * 0.2f).asTextSize(),
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                        textAlign = textAlign,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun formatPhotoDate(date: LocalDate, locale: Locale): String =
+    format(date, DateFormat.getBestDateTimePattern(locale, "yMMMMd"), locale, fallback = "MMMM d, yyyy")
 
 @Composable
 private fun Weather(weather: CurrentWeather, forecast: DailyForecast?, night: Boolean, size: Dp) {
@@ -506,7 +690,7 @@ internal fun conditionLabel(condition: String, night: Boolean): String {
 }
 
 /** Formats with a locale's best pattern, falling back if java.time doesn't know one of its letters. */
-private fun format(time: LocalDateTime, pattern: String, locale: Locale, fallback: String): String = try {
+private fun format(time: TemporalAccessor, pattern: String, locale: Locale, fallback: String): String = try {
     DateTimeFormatter.ofPattern(pattern, locale).format(time)
 } catch (e: IllegalArgumentException) {
     DateTimeFormatter.ofPattern(fallback, locale).format(time)

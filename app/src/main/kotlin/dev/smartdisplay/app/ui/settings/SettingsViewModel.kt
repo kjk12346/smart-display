@@ -63,6 +63,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setWifi(wifi: WifiConfig) = kiosk.setWifi(wifi)
 
+    fun setClockCorner(corner: Boolean) {
+        kiosk.setWallpaper(config.value.wallpaper.copy(clockCorner = corner))
+    }
+
+    fun setPhotoInfo(show: Boolean) {
+        kiosk.setWallpaper(config.value.wallpaper.copy(photoInfo = show))
+    }
+
     fun setWallpaperInterval(minutes: Int) {
         kiosk.setWallpaper(config.value.wallpaper.copy(intervalMinutes = minutes))
     }

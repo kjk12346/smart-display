@@ -19,6 +19,7 @@ import kotlinx.serialization.json.put
 /** Keeps today's forecast and the current wallpaper photo for the ambient screen, across rotations. */
 class AmbientViewModel(application: Application) : AndroidViewModel(application) {
     private val home = (application as SmartDisplayApp).home
+    private val photoInfo = PhotoInfoReader(application, (application as SmartDisplayApp).http)
 
     private val _forecast = MutableStateFlow<Pair<String, DailyForecast>?>(null)
 
@@ -118,11 +119,11 @@ class AmbientViewModel(application: Application) : AndroidViewModel(application)
                 delay(interval - shownFor)
                 continue
             }
-            if (!showNextPhoto(folder)) delay(RETRY_MS)
+            if (!showNextPhoto(folder, config.photoInfo)) delay(RETRY_MS)
         }
     }
 
-    private suspend fun showNextPhoto(folder: String): Boolean = try {
+    private suspend fun showNextPhoto(folder: String, withInfo: Boolean): Boolean = try {
         val now = System.currentTimeMillis()
         if (listedFor != folder || photoQueue.roundOver || now - listedAt >= LIST_REFRESH_MS) {
             photos = home.browseMedia(folder).children.filter { it.isImage }.map { it.contentId }
@@ -138,8 +139,10 @@ class AmbientViewModel(application: Application) : AndroidViewModel(application)
             val context = getApplication<Application>()
             when (val result = SingletonImageLoader.get(context).execute(wallpaperRequest(context, url))) {
                 is SuccessResult -> {
+                    // Read before showing, so the place and date fade in with their photo.
+                    val info = if (withInfo) photoInfo.read(url) else null
                     Log.i(TAG, "Wallpaper: showing $next")
-                    _wallpaper.value = Wallpaper(url, folder, System.currentTimeMillis())
+                    _wallpaper.value = Wallpaper(url, folder, System.currentTimeMillis(), info)
                     true
                 }
                 is ErrorResult -> {
@@ -164,5 +167,5 @@ class AmbientViewModel(application: Application) : AndroidViewModel(application)
     }
 }
 
-/** A downloaded wallpaper photo, from [folderId], shown since [shownAt]. */
-data class Wallpaper(val url: String, val folderId: String, val shownAt: Long)
+/** A downloaded wallpaper photo, from [folderId], shown since [shownAt], and where and when it was taken. */
+data class Wallpaper(val url: String, val folderId: String, val shownAt: Long, val info: PhotoInfo? = null)

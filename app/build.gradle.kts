@@ -21,8 +21,8 @@ android {
         applicationId = "dev.smartdisplay.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.1.10"
+        versionCode = 12
+        versionName = "0.1.11"
     }
 
     signingConfigs {
@@ -77,6 +77,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.exifinterface)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.zxing.core)
