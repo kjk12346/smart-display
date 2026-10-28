@@ -39,6 +39,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,6 +60,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -737,95 +739,129 @@ private fun PeopleCard(
     modifier: Modifier,
     scroll: Boolean,
 ) {
-    TitledCard(stringResource(R.string.dashboard_people), modifier, scroll) {
-        if (people.isEmpty()) {
-            Text(
-                stringResource(R.string.dashboard_no_people),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // Their initials, and where they are: filled in their color at home, a ring of it when out (with the zone,
-        // such as Work, under it), a faint dashed ring when nothing says where they are.
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            people.forEach { person ->
-                val color = colorOf(person.entityId) ?: MaterialTheme.colorScheme.primary
-                val muted = MaterialTheme.colorScheme.onSurfaceVariant
-                val where = when (person.presence) {
-                    Presence.Home -> stringResource(R.string.presence_home)
-                    Presence.Away -> person.place ?: stringResource(R.string.presence_away)
-                    Presence.Unknown -> stringResource(R.string.presence_unknown)
-                }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .width(PERSON_WIDTH)
-                        .semantics(mergeDescendants = true) { contentDescription = "${person.name}, $where" },
+    // In a card of fixed size, Home and Away keep to the bottom, and the people scroll above them if they must.
+    TitledCard(stringResource(R.string.dashboard_people), modifier, scroll = false) {
+        val peopleRows: @Composable () -> Unit = {
+            if (people.isEmpty()) {
+                Text(
+                    stringResource(R.string.dashboard_no_people),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // Their initials, and where they are: filled in their color at home, a ring of it when out (with the zone,
+            // such as Work, under it), a faint dashed ring when nothing says where they are. As many to a row as fit,
+            // the circles as big as that allows (up to 56 dp, down to 44).
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val gap = 10.dp
+                val perRow = ((maxWidth + gap) / (PERSON_MIN + gap)).toInt()
+                    .coerceIn(1, people.size.coerceAtLeast(1))
+                val column = ((maxWidth - gap * (perRow - 1)) / perRow).coerceAtMost(PERSON_WIDTH)
+                val circle = (column - 12.dp).coerceIn(44.dp, 56.dp)
+                val initialsStyle = MaterialTheme.typography.run { if (circle < 52.dp) titleMedium else titleLarge }
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    verticalArrangement = Arrangement.spacedBy(gap),
                 ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .then(
-                                when (person.presence) {
-                                    Presence.Home -> Modifier.background(color)
-                                    Presence.Away -> Modifier.border(3.dp, color, CircleShape)
-                                    Presence.Unknown -> Modifier.drawBehind {
-                                        val stroke = 2.dp.toPx()
-                                        drawCircle(
-                                            muted.copy(alpha = 0.6f),
-                                            radius = size.minDimension / 2 - stroke / 2,
-                                            style = Stroke(
-                                                stroke,
-                                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())),
-                                            ),
-                                        )
-                                    }
-                                },
-                            ),
-                    ) {
-                        Text(
-                            person.initials,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = when (person.presence) {
-                                Presence.Home -> OnPersonColor
-                                Presence.Away -> color
-                                Presence.Unknown -> muted
-                            },
-                        )
+                    people.forEach { person ->
+                        val color = colorOf(person.entityId) ?: MaterialTheme.colorScheme.primary
+                        val muted = MaterialTheme.colorScheme.onSurfaceVariant
+                        val dash = with(LocalDensity.current) { floatArrayOf(6.dp.toPx(), 5.dp.toPx()) }
+                        val where = when (person.presence) {
+                            Presence.Home -> stringResource(R.string.presence_home)
+                            Presence.Away -> person.place ?: stringResource(R.string.presence_away)
+                            Presence.Unknown -> stringResource(R.string.presence_unknown)
+                        }
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .width(column)
+                                .semantics(mergeDescendants = true) { contentDescription = "${person.name}, $where" },
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(circle)
+                                    .clip(CircleShape)
+                                    .then(
+                                        when (person.presence) {
+                                            Presence.Home -> Modifier.background(color)
+                                            Presence.Away -> Modifier.border(3.dp, color, CircleShape)
+                                            Presence.Unknown -> Modifier.drawBehind {
+                                                val stroke = 2.dp.toPx()
+                                                drawCircle(
+                                                    muted.copy(alpha = 0.6f),
+                                                    radius = size.minDimension / 2 - stroke / 2,
+                                                    style = Stroke(
+                                                        stroke,
+                                                        pathEffect = PathEffect.dashPathEffect(dash),
+                                                    ),
+                                                )
+                                            }
+                                        },
+                                    ),
+                            ) {
+                                Text(
+                                    person.initials,
+                                    style = initialsStyle,
+                                    color = when (person.presence) {
+                                        Presence.Home -> OnPersonColor
+                                        Presence.Away -> color
+                                        Presence.Unknown -> muted
+                                    },
+                                )
+                            }
+                            Text(
+                                where,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (person.presence == Presence.Home) LocalContentColor.current else muted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
                     }
-                    Text(
-                        where,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (person.presence == Presence.Home) MaterialTheme.colorScheme.onSurface else muted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
                 }
             }
         }
-        val homeAction = kitchen.homeAction
-        val awayAction = kitchen.awayAction
-        if (homeAction != null || awayAction != null) {
-            // Side by side in equal halves, so neither gets squeezed in a narrow column.
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-            ) {
-                if (homeAction != null) {
-                    val label = stringResource(R.string.mode_home)
-                    RunButton(label, runs[homeAction], filled = true, Modifier.weight(1f)) { onRun(homeAction) }
-                }
-                if (awayAction != null) {
-                    val label = stringResource(R.string.mode_away)
-                    RunButton(label, runs[awayAction], filled = false, Modifier.weight(1f)) { onRun(awayAction) }
+        val actions: @Composable () -> Unit = {
+            val homeAction = kitchen.homeAction
+            val awayAction = kitchen.awayAction
+            if (homeAction != null || awayAction != null) {
+                // Side by side in equal halves, so neither gets squeezed in a narrow column.
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                ) {
+                    if (homeAction != null) {
+                        val label = stringResource(R.string.mode_home)
+                        RunButton(label, runs[homeAction], filled = true, Modifier.weight(1f), height = 52.dp) {
+                            onRun(homeAction)
+                        }
+                    }
+                    if (awayAction != null) {
+                        val label = stringResource(R.string.mode_away)
+                        RunButton(label, runs[awayAction], filled = false, Modifier.weight(1f), height = 52.dp) {
+                            onRun(awayAction)
+                        }
+                    }
                 }
             }
+        }
+        if (scroll) {
+            BoxWithConstraints(Modifier.weight(1f)) {
+                val height = maxHeight
+                Column(
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.verticalScroll(rememberScrollState()).heightIn(min = height),
+                ) {
+                    Column { peopleRows() }
+                    actions()
+                }
+            }
+        } else {
+            peopleRows()
+            actions()
         }
     }
 }
@@ -876,6 +912,7 @@ private val TILE_MIN_WIDTH = 68.dp
 
 /** Each person's column in Who's home: their circle, and where they are under it. */
 private val PERSON_WIDTH = 72.dp
+private val PERSON_MIN = 56.dp
 private val TILE_GAP = 10.dp
 
 /**
@@ -931,6 +968,7 @@ private fun RunButton(
     state: RunState?,
     filled: Boolean,
     modifier: Modifier = Modifier,
+    height: Dp = 64.dp,
     onClick: () -> Unit,
 ) {
     val text = when (state) {
@@ -939,7 +977,7 @@ private fun RunButton(
         RunState.Failed -> stringResource(R.string.run_failed)
         null -> label
     }
-    val size = modifier.heightIn(min = 64.dp).widthIn(min = 120.dp)
+    val size = modifier.heightIn(min = height).widthIn(min = 96.dp)
     val padding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
     val content: @Composable () -> Unit = {
         Text(text, fontSize = 18.sp, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
