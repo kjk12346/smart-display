@@ -44,7 +44,7 @@
     <string name="mode_owner">Owner</string>
     <string name="mode_guest">Guest room</string>
     <string name="mode_owner_body">Every room in Home Assistant.</string>
-    <string name="mode_guest_body">One room, plus any devices you add from other rooms. Needs the exit PIN.</string>
+    <string name="mode_guest_body">One room, plus any devices you add from other rooms. Needs the PIN.</string>
     <string name="mode_kitchen">Family / kitchen</string>
     <string name="mode_kitchen_body">A daytime dashboard for a shared space: who\'s home, buttons for your scenes and scripts, the forecast and photos. Every room\'s controls are a tap away. At night, the clock over your photos, dimmed.</string>
     <string name="kitchen_buttons">Dashboard buttons</string>
@@ -189,8 +189,8 @@
     <string name="settings_kitchen_summary">Calendars, people, Home and Away, screensaver</string>
     <string name="settings_alarms_summary">Sound, lights, speaker, sunrise</string>
     <string name="settings_wind_down_summary">Dimming the lights before bed</string>
-    <string name="settings_kiosk_summary">No exit PIN yet; Home app and pinning</string>
-    <string name="settings_kiosk_summary_pin">Exit PIN, Home app and pinning</string>
+    <string name="settings_kiosk_summary">No PIN yet; Home app and pinning</string>
+    <string name="settings_kiosk_summary_pin">PIN, Home app and pinning</string>
     <string name="settings_connection">Home Assistant</string>
     <string name="settings_back">Back</string>
     <string name="settings_keep_on">Keep screen on</string>
@@ -211,7 +211,7 @@
     <string name="media_empty">Nothing usable here.</string>
     <string name="media_use_folder">Use this folder</string>
     <string name="settings_kiosk">Kiosk</string>
-    <string name="settings_exit_pin">Exit PIN</string>
+    <string name="settings_exit_pin">PIN</string>
     <string name="settings_pin_set">Settings ask for the PIN. It\'s the way out of the Home app and pinning.</string>
     <string name="settings_pin_unset">No PIN. Set one before using this as the Home app or pinning it.</string>
     <string name="settings_pin_create">Set PIN</string>
@@ -221,14 +221,14 @@
     <string name="settings_home_app_body">Opens on startup and when Home is pressed. Android asks you to choose it.</string>
     <string name="settings_pin_app">Pin the app</string>
     <string name="settings_pin_app_body">Keeps people in this app. Opening settings with the PIN unpins it.</string>
-    <string name="settings_needs_pin">Set an exit PIN first (under Kiosk), so there\'s a way out.</string>
+    <string name="settings_needs_pin">Set a PIN first (under Kiosk), so there\'s a way out.</string>
     <string name="settings_no_home_chooser">This device doesn\'t let you choose a Home app here. Press Home to see if Android offers it.</string>
     <string name="settings_pin_in_use">Turn off guest mode, Home app and pinning before removing the PIN.</string>
     <string name="pin_enter_title">Enter PIN</string>
     <string name="pin_label">PIN</string>
     <string name="pin_open_settings">Open settings</string>
     <string name="pin_wrong">Wrong PIN.</string>
-    <string name="pin_set_title">Set exit PIN</string>
+    <string name="pin_set_title">Set PIN</string>
     <string name="pin_new_label">New PIN (4 to 8 digits)</string>
     <string name="pin_again_label">Type it again</string>
     <string name="pin_format">Use 4 to 8 digits.</string>
