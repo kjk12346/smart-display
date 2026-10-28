@@ -11,7 +11,8 @@ import kotlinx.serialization.json.put
 
 /**
  * What a dashboard card shows. Calendar, Who's home, Buttons and Weather take their sources from [KitchenConfig] and
- * there's one of each; the others keep their own ([DashCard.areaId], [DashCard.entities]) and can be added more than once.
+ * there's one of each; the others keep their own ([DashCard.areaId], [DashCard.entities]) and can be added more than
+ * once.
  */
 enum class CardType(val single: Boolean) {
     Calendar(true),
@@ -70,6 +71,22 @@ data class DashLayout(val cards: List<DashCard> = DEFAULT_CARDS) {
     fun move(cardId: String, grid: Grid, rect: CardRect): DashLayout {
         if (!canPlace(cardId, grid, rect)) return this
         return copy(cards = cards.map { if (it.id == cardId) it.withRect(grid, rect) else it })
+    }
+
+    /**
+     * [cardId] moved or resized to [rect] on [grid], the other cards making way: those it lands on move down, and then
+     * every card slides up as far as it can, so no gaps are left. If they'd no longer fit, a card dropped on a single
+     * other card swaps places with it, or else the tallest of the others give up rows. Null if nothing makes it fit.
+     */
+    fun arrange(cardId: String, grid: Grid, rect: CardRect): DashLayout? {
+        val moving = cards.firstOrNull { it.id == cardId } ?: return null
+        if (!rect.fits(grid)) return null
+        val others = cards.filter { it.id != cardId }.associate { it.id to it.rect(grid) }
+        val placed = packed(cardId, rect, others, grid)
+            ?: swapped(cardId, moving.rect(grid), rect, others, grid)
+            ?: shrunk(cardId, rect, others, grid)
+            ?: return null
+        return copy(cards = cards.map { it.withRect(grid, placed.getValue(it.id)) })
     }
 
     fun remove(cardId: String): DashLayout = copy(cards = cards.filterNot { it.id == cardId })
@@ -154,6 +171,50 @@ data class DashLayout(val cards: List<DashCard> = DEFAULT_CARDS) {
         return null
     }
 }
+
+/**
+ * [rect] for [cardId], and [others] where they first fit from the top, in their order down the grid (so the ones it
+ * lands on go below it); then all of them slid up in that order. Null if one doesn't fit.
+ */
+private fun packed(cardId: String, rect: CardRect, others: Map<String, CardRect>, grid: Grid): Map<String, CardRect>? {
+    val placed = linkedMapOf(cardId to rect)
+    for ((id, at) in others.entries.sortedWith(compareBy({ it.value.y }, { it.value.x }))) {
+        placed[id] = at.copy(y = firstFreeRow(at, placed.values, grid) ?: return null)
+    }
+    val slid = linkedMapOf<String, CardRect>()
+    for ((id, at) in placed.entries.sortedWith(compareBy({ it.value.y }, { it.value.x }))) {
+        slid[id] = at.copy(y = firstFreeRow(at, slid.values, grid) ?: return null)
+    }
+    return slid
+}
+
+/** [cardId] at [rect] and the one card it covers moved to where [cardId] was ([from]), if that's all it covers. */
+private fun swapped(
+    cardId: String,
+    from: CardRect,
+    rect: CardRect,
+    others: Map<String, CardRect>,
+    grid: Grid,
+): Map<String, CardRect>? {
+    val covered = others.filter { it.value.overlaps(rect) }.entries.singleOrNull() ?: return null
+    val moved = covered.value.copy(x = from.x, y = from.y)
+    if (!moved.fits(grid)) return null
+    return packed(cardId, rect, others + (covered.key to moved), grid)
+}
+
+/** As [packed], with the tallest of [others] a row shorter at a time until they fit; null if they never do. */
+private fun shrunk(cardId: String, rect: CardRect, others: Map<String, CardRect>, grid: Grid): Map<String, CardRect>? {
+    var sizes = others
+    while (true) {
+        val tallest = sizes.entries.filter { it.value.h > MIN_CARD_CELLS }.maxByOrNull { it.value.h } ?: return null
+        sizes = sizes + (tallest.key to tallest.value.copy(h = tallest.value.h - 1))
+        packed(cardId, rect, sizes, grid)?.let { return it }
+    }
+}
+
+/** The highest row [rect] can be at in its columns without covering any of [taken]; null if there's none. */
+private fun firstFreeRow(rect: CardRect, taken: Collection<CardRect>, grid: Grid): Int? =
+    (0..grid.rows - rect.h).firstOrNull { y -> taken.none { it.overlaps(rect.copy(y = y)) } }
 
 /** Today's arrangement: the calendar most of the way across, Who's home and Buttons beside it (or under it). */
 val DEFAULT_CARDS = listOf(

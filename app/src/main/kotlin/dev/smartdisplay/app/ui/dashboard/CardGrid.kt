@@ -1,5 +1,13 @@
 package dev.smartdisplay.app.ui.dashboard
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,8 +56,8 @@ private val CARD_SHAPE = RoundedCornerShape(24.dp)
 
 /**
  * The cards on a [grid] that fills the space given. While [editing], each card can be dragged to another place or
- * resized from its corner; it snaps to the cells, and goes back if it would cover another card or leave the grid.
- * Each also offers Sources (what it shows) and Hide.
+ * resized from its corner; it snaps to the cells, and the other cards make way ([DashLayout.arrange]), moving as it's
+ * dragged to show where they'd go. Each also offers Sources (what it shows) and Hide.
  */
 @Composable
 internal fun CardGrid(
@@ -66,12 +74,32 @@ internal fun CardGrid(
         val cellH = (maxHeight - GAP * (grid.rows - 1)) / grid.rows
         val cells = Cells(cellW, cellH)
         if (editing) GridCells(grid, cells)
+        // The card being dragged and where it would land, and the layout that would make.
+        var moving by remember { mutableStateOf<Pair<String, CardRect>?>(null) }
+        val preview = remember(layout, moving, grid) {
+            moving?.let { (id, target) -> layout.arrange(id, grid, target) }
+        }
         layout.cards.forEach { card ->
             key(card.id) {
                 val rect = card.rect(grid)
                 val place = Modifier.offset(cells.x(rect), cells.y(rect)).size(cells.width(rect), cells.height(rect))
                 if (editing) {
-                    EditableCard(card, rect, layout, grid, cells, onLayoutChange, onSources) { content(card, it) }
+                    val dragged = moving?.first == card.id
+                    val previewRect = preview?.cards?.firstOrNull { it.id == card.id }?.rect(grid)
+                    EditableCard(
+                        card = card,
+                        rect = rect,
+                        // The others show where they'd go; the one dragged shows where it would land.
+                        shown = if (dragged) rect else previewRect ?: rect,
+                        landing = if (dragged) previewRect else null,
+                        blocked = dragged && moving?.second != rect && preview == null,
+                        layout = layout,
+                        grid = grid,
+                        cells = cells,
+                        onTarget = { target -> moving = target?.let { card.id to it } },
+                        onLayoutChange = onLayoutChange,
+                        onSources = onSources,
+                    ) { content(card, it) }
                 } else {
                     content(card, place)
                 }
@@ -105,25 +133,38 @@ private fun GridCells(grid: Grid, cells: Cells) {
     }
 }
 
+/**
+ * A card while arranging. It sits at [shown] (where the card being dragged would push it, or [rect]), gliding there;
+ * the one being dragged follows the finger, with a ring at its [landing] (red where it can't go, [blocked]).
+ */
 @Composable
 private fun EditableCard(
     card: DashCard,
     rect: CardRect,
+    shown: CardRect,
+    landing: CardRect?,
+    blocked: Boolean,
     layout: DashLayout,
     grid: Grid,
     cells: Cells,
+    onTarget: (CardRect?) -> Unit,
     onLayoutChange: (DashLayout) -> Unit,
     onSources: (DashCard) -> Unit,
     content: @Composable (Modifier) -> Unit,
 ) {
     val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
     var drag by remember { mutableStateOf(Offset.Zero) }
     var stretch by remember { mutableStateOf(Offset.Zero) }
     var active by remember { mutableStateOf(false) }
+    // After a drop, the card glides from where it was let go to where it landed.
+    val settle = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
     // Gestures outlive recompositions; they read the latest of these.
     val currentLayout by rememberUpdatedState(layout)
     val currentRect by rememberUpdatedState(rect)
+    val currentCells by rememberUpdatedState(cells)
     val currentOnChange by rememberUpdatedState(onLayoutChange)
+    val currentOnTarget by rememberUpdatedState(onTarget)
     val step by rememberUpdatedState(with(density) { Offset((cells.w + GAP).toPx(), (cells.h + GAP).toPx()) })
 
     // Where the card would land: snapped to the nearest cells.
@@ -133,43 +174,58 @@ private fun EditableCard(
         w = from.w + (stretch.x / step.x).roundToInt(),
         h = from.h + (stretch.y / step.y).roundToInt(),
     )
-    val target = targetOf(rect)
-    val valid = layout.canPlace(card.id, grid, target)
+    fun moved() = currentOnTarget(targetOf(currentRect).takeIf { it != currentRect })
     fun drop() {
-        val landing = targetOf(currentRect)
-        if (landing != currentRect) {
-            // move() leaves the layout as it was if the card can't go there.
-            currentOnChange(currentLayout.move(card.id, grid, landing))
+        val from = currentRect
+        val target = targetOf(from)
+        val arranged = if (target != from) currentLayout.arrange(card.id, grid, target) else null
+        val to = arranged?.cards?.firstOrNull { it.id == card.id }?.rect(grid) ?: from
+        // Where it was let go, measured from where it now sits.
+        val leftover = with(density) {
+            Offset(
+                (currentCells.x(from) - currentCells.x(to)).toPx() + drag.x,
+                (currentCells.y(from) - currentCells.y(to)).toPx() + drag.y,
+            )
         }
-        drag = Offset.Zero
-        stretch = Offset.Zero
-        active = false
+        scope.launch {
+            settle.snapTo(leftover)
+            if (arranged != null) currentOnChange(arranged)
+            drag = Offset.Zero
+            stretch = Offset.Zero
+            active = false
+            currentOnTarget(null)
+            settle.animateTo(Offset.Zero, tween(SETTLE_MS))
+        }
     }
 
-    if (active && target != rect) {
-        val ring = if (valid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    if (active && landing != null && landing != rect) {
         Box(
             Modifier
-                .offset(cells.x(target), cells.y(target))
-                .size(cells.width(target), cells.height(target))
-                .border(3.dp, ring, CARD_SHAPE),
+                .offset(cells.x(landing), cells.y(landing))
+                .size(cells.width(landing), cells.height(landing))
+                .border(3.dp, MaterialTheme.colorScheme.primary, CARD_SHAPE),
         )
     }
+    // Others glide to make way; the dragged card itself jumps (its own movement is the finger's).
+    val glide = !active && settle.value == Offset.Zero
+    val spec: AnimationSpec<Dp> = if (glide) tween(SETTLE_MS) else snap()
+    val x by animateDpAsState(cells.x(shown), spec, label = "x")
+    val y by animateDpAsState(cells.y(shown), spec, label = "y")
+    val width by animateDpAsState(cells.width(shown), spec, label = "width")
+    val height by animateDpAsState(cells.height(shown), spec, label = "height")
     val stretchW = with(density) { stretch.x.toDp() }
     val stretchH = with(density) { stretch.y.toDp() }
+    val outline = if (blocked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
     Box(
         Modifier
-            .zIndex(if (active) 1f else 0f)
-            .offset(cells.x(rect), cells.y(rect))
+            .zIndex(if (active || settle.value != Offset.Zero) 1f else 0f)
+            .offset(x, y)
             .graphicsLayer {
-                translationX = drag.x
-                translationY = drag.y
+                translationX = drag.x + settle.value.x
+                translationY = drag.y + settle.value.y
                 alpha = if (active) 0.85f else 1f
             }
-            .size(
-                (cells.width(rect) + stretchW).coerceAtLeast(cells.w),
-                (cells.height(rect) + stretchH).coerceAtLeast(cells.h),
-            ),
+            .size((width + stretchW).coerceAtLeast(cells.w), (height + stretchH).coerceAtLeast(cells.h)),
     ) {
         content(Modifier.fillMaxSize())
         // Over the card: catches every touch (so nothing inside reacts while arranging), and moves it.
@@ -178,7 +234,7 @@ private fun EditableCard(
                 .fillMaxSize()
                 .clip(CARD_SHAPE)
                 .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.35f))
-                .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), CARD_SHAPE)
+                .border(2.dp, outline, CARD_SHAPE)
                 .pointerInput(card.id, grid) {
                     detectDragGestures(
                         onDragStart = { active = true },
@@ -187,6 +243,7 @@ private fun EditableCard(
                     ) { change, amount ->
                         change.consume()
                         drag += amount
+                        moved()
                     }
                 },
         ) {
@@ -212,12 +269,16 @@ private fun EditableCard(
                         ) { change, amount ->
                             change.consume()
                             stretch += amount
+                            moved()
                         }
                     },
             )
         }
     }
 }
+
+/** How long cards take to glide into place. */
+private const val SETTLE_MS = 220
 
 /** A corner with two diagonal strokes, to drag a card bigger or smaller. */
 @Composable

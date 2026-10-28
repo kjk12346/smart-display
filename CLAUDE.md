@@ -110,7 +110,8 @@ Home Assistant.
   portrait (`TALL_GRID`, tablets ≥ 600 dp wide); phones stack them in the portrait order. Each card has a place on
   both (`kiosk/DashLayout.kt`, saved in `KitchenConfig.layout`; the default is the old fixed layout). A long press on
   the dashboard (behind the exit PIN) starts arranging (`CardGrid`): drag to move, the corner to resize, snapping to
-  cells and refusing overlaps; Hide; Sources (`CardSources.kt`: calendars and whose, who's shown and Home/Away,
+  cells; the others make way (`DashLayout.arrange`: cards it lands on move down, then all slide up; a drop on one
+  neighbour swaps them if the push won't fit, else the tallest give up rows), gliding to show it while dragging; Hide; Sources (`CardSources.kt`: calendars and whose, who's shown and Home/Away,
   buttons, and the weather entity, which the clock screen shares); Add card. Calendar, Who's home and Buttons are one
   each and use `KitchenConfig`; Devices (an area's controls plus picked ones, via `ControlCard`), Sensors, Now
   playing and Camera (`entity_picture` refreshed every 10 s) keep their own sources and can be added more than

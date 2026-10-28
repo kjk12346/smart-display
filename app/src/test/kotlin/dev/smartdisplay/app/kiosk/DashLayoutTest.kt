@@ -100,6 +100,58 @@ class DashLayoutTest {
         assertEquals(layout.cards.map { it.tall }, reset.cards.map { it.tall })
     }
 
+    /** Portrait with a weather card along the bottom, as on the 15.6" tablet. */
+    private val withWeather = DashLayout(
+        listOf(
+            DashCard("calendar", CardType.Calendar, wide = CardRect(0, 0, 9, 8), tall = CardRect(0, 0, 6, 6)),
+            DashCard("people", CardType.People, wide = CardRect(9, 0, 3, 4), tall = CardRect(0, 6, 3, 4)),
+            DashCard("buttons", CardType.Buttons, wide = CardRect(9, 4, 3, 4), tall = CardRect(3, 6, 3, 4)),
+            DashCard("weather", CardType.Weather, wide = CardRect(0, 0, 2, 2), tall = CardRect(0, 10, 6, 2)),
+        ),
+    )
+
+    private fun DashLayout.tall(id: String) = cards.first { it.id == id }.tall
+
+    @Test
+    fun `a card dragged to the top pushes the others down`() {
+        val moved = withWeather.arrange("weather", TALL_GRID, CardRect(0, 0, 6, 2))!!
+        assertEquals(CardRect(0, 0, 6, 2), moved.tall("weather"))
+        assertEquals(CardRect(0, 2, 6, 6), moved.tall("calendar"))
+        assertEquals(CardRect(0, 8, 3, 4), moved.tall("people"))
+        assertEquals(CardRect(3, 8, 3, 4), moved.tall("buttons"))
+        // Landscape is left alone.
+        assertEquals(withWeather.cards.map { it.wide }, moved.cards.map { it.wide })
+    }
+
+    @Test
+    fun `a card dragged into the middle goes between, and the rest close up behind it`() {
+        val top = withWeather.arrange("weather", TALL_GRID, CardRect(0, 0, 6, 2))!!
+        val middle = top.arrange("weather", TALL_GRID, CardRect(0, 6, 6, 2))!!
+        assertEquals(CardRect(0, 0, 6, 6), middle.tall("calendar"))
+        assertEquals(CardRect(0, 6, 6, 2), middle.tall("weather"))
+        assertEquals(CardRect(0, 8, 3, 4), middle.tall("people"))
+    }
+
+    @Test
+    fun `a card dropped on its neighbour swaps with it`() {
+        val swapped = withWeather.arrange("people", TALL_GRID, CardRect(3, 6, 3, 4))!!
+        assertEquals(CardRect(3, 6, 3, 4), swapped.tall("people"))
+        assertEquals(CardRect(0, 6, 3, 4), swapped.tall("buttons"))
+        assertEquals(CardRect(0, 0, 6, 6), swapped.tall("calendar"))
+    }
+
+    @Test
+    fun `a card made taller pushes the ones below down, and the tallest give way if they must`() {
+        val taller = withWeather.arrange("calendar", TALL_GRID, CardRect(0, 0, 6, 7))!!
+        assertEquals(CardRect(0, 0, 6, 7), taller.tall("calendar"))
+        // People and Buttons gave up a row so everything still fits.
+        assertEquals(12, taller.cards.maxOf { it.tall.y + it.tall.h })
+        taller.cards.forEach { a ->
+            taller.cards.filter { it !== a }.forEach { b -> assertFalse(a.tall.overlaps(b.tall)) }
+        }
+        assertNull(withWeather.arrange("calendar", TALL_GRID, CardRect(0, 0, 6, 13)))
+    }
+
     @Test
     fun `the layout survives saving`() {
         val layout = DashLayout().remove("buttons").add(CardType.Devices, "devices-1")!!.let { added ->
