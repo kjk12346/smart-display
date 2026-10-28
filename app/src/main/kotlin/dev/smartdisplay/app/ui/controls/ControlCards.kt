@@ -1,6 +1,7 @@
 package dev.smartdisplay.app.ui.controls
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -55,12 +56,12 @@ private const val SETPOINT_COMMIT_MS = 900L
 private const val PENDING_TIMEOUT_MS = 5_000L
 
 @Composable
-fun ControlCard(control: Control, temperatureUnit: String?, onCall: (ServiceCall) -> Unit) {
+fun ControlCard(control: Control, temperatureUnit: String?, remote: TvRemote? = null, onCall: (ServiceCall) -> Unit) {
     when (control.kind) {
         ControlKind.Light -> LightCard(control, onCall)
         ControlKind.Switch -> SwitchCard(control, onCall)
         ControlKind.Climate -> ClimateCard(control, temperatureUnit, onCall)
-        ControlKind.MediaPlayer -> MediaCard(control, onCall)
+        ControlKind.MediaPlayer -> MediaCard(control, remote, onCall)
     }
 }
 
@@ -166,19 +167,27 @@ private fun SwitchCard(control: Control, onCall: (ServiceCall) -> Unit) {
     }
 }
 
+/**
+ * A media player: play/pause, and what's playing. Speakers show their volume when the name is tapped; a TV (or a
+ * player with a [remote]) opens its controls instead: power, inputs, the remote's keys and the volume.
+ */
 @Composable
-private fun MediaCard(control: Control, onCall: (ServiceCall) -> Unit) {
+private fun MediaCard(control: Control, remote: TvRemote?, onCall: (ServiceCall) -> Unit) {
     val info = control.entity.mediaInfo()
     val available = !control.unavailable
+    val tv = info.isTv || remote != null
     // The volume stays out of the way until the player's name is tapped.
     var showVolume by rememberSaveable(control.entityId) { mutableStateOf(false) }
+    var showTv by rememberSaveable(control.entityId) { mutableStateOf(false) }
     CardFrame(on = info.playing, enabled = available, onClick = null) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CardTitle(
                 control.name,
                 Modifier
                     .weight(1f)
-                    .clickable(enabled = available && info.canSetVolume) { showVolume = !showVolume },
+                    .clickable(enabled = available && (tv || info.canSetVolume)) {
+                        if (tv) showTv = true else showVolume = !showVolume
+                    },
             )
             if (available && info.active && info.canPlayPause) {
                 FilledTonalIconButton(onClick = { onCall(Calls.playPause(control.entityId)) }) {
@@ -194,10 +203,16 @@ private fun MediaCard(control: Control, onCall: (ServiceCall) -> Unit) {
                 else -> mediaStateLabel(control.entity.state)
             }
         )
-        if (showVolume && available && info.canSetVolume) {
+        if (tv && available) {
+            FilledTonalButton(onClick = { showTv = true }, modifier = Modifier.padding(top = 8.dp)) {
+                Text(stringResource(R.string.tv_controls))
+            }
+        }
+        if (!tv && showVolume && available && info.canSetVolume) {
             SentSlider(value = info.volume ?: 0f, onSend = { onCall(Calls.volume(control.entityId, it)) })
         }
     }
+    if (showTv) TvControlsDialog(control, remote, onCall, onDismiss = { showTv = false })
 }
 
 @Composable
@@ -329,7 +344,7 @@ internal fun PlayPauseGlyph(playing: Boolean, glyphSize: Dp = 18.dp) {
 }
 
 @Composable
-private fun mediaStateLabel(state: String): String = when (state) {
+internal fun mediaStateLabel(state: String): String = when (state) {
     "off" -> stringResource(R.string.control_off)
     "on" -> stringResource(R.string.control_on)
     "idle" -> stringResource(R.string.media_idle)
@@ -350,4 +365,26 @@ private fun hvacModeLabel(mode: String): String = when (mode) {
     "dry" -> stringResource(R.string.hvac_dry)
     "fan_only" -> stringResource(R.string.hvac_fan_only)
     else -> mode.replace('_', ' ').replaceFirstChar { it.titlecase(LocalConfiguration.current.locales[0]) }
+}
+
+/** A triangle against a bar: skip to the next track, or (pointing left) back to the previous one. */
+@Composable
+internal fun SkipGlyph(forward: Boolean) {
+    val color = LocalContentColor.current
+    Canvas(Modifier.size(20.dp)) {
+        val w = size.width
+        val h = size.height
+        val flip = { x: Float -> if (forward) x else w - x }
+        drawPath(
+            Path().apply {
+                moveTo(flip(w * 0.1f), h * 0.1f)
+                lineTo(flip(w * 0.72f), h * 0.5f)
+                lineTo(flip(w * 0.1f), h * 0.9f)
+                close()
+            },
+            color,
+        )
+        val barX = if (forward) w * 0.74f else w * 0.08f
+        drawRect(color, topLeft = Offset(barX, h * 0.1f), size = Size(w * 0.18f, h * 0.8f))
+    }
 }

@@ -25,6 +25,8 @@ data class KioskConfig(
     val guest: GuestConfig = GuestConfig(),
     val wallpaper: WallpaperConfig = WallpaperConfig(),
     val kitchen: KitchenConfig = KitchenConfig(),
+    /** The Wi-Fi guests join, shown as a QR code. */
+    val wifi: WifiConfig = WifiConfig(),
 ) {
     val isGuest: Boolean get() = mode == DisplayMode.Guest
     val isKitchen: Boolean get() = mode == DisplayMode.Kitchen
@@ -80,6 +82,13 @@ class KioskStore(context: Context) {
         putString(KEY_KITCHEN_STATUS, encodeIds(kitchen.statusEntities))
         putString(KEY_KITCHEN_SHORTCUT_NAMES, encodeMap(kitchen.shortcutNames))
         putString(KEY_KITCHEN_SHORTCUT_ICONS, encodeMap(kitchen.shortcutIcons))
+    }
+
+    fun setWifi(wifi: WifiConfig) = update {
+        putString(KEY_WIFI_SSID, wifi.ssid?.takeIf { it.isNotBlank() })
+        putString(KEY_WIFI_PASSWORD, wifi.password)
+        putString(KEY_WIFI_SECURITY, wifi.security.name)
+        putBoolean(KEY_WIFI_HIDDEN, wifi.hidden)
     }
 
     fun setPin(pin: String) {
@@ -152,6 +161,13 @@ class KioskStore(context: Context) {
             shortcutNames = decodeMap(prefs.getString(KEY_KITCHEN_SHORTCUT_NAMES, null)),
             shortcutIcons = decodeMap(prefs.getString(KEY_KITCHEN_SHORTCUT_ICONS, null)),
         ),
+        wifi = WifiConfig(
+            ssid = prefs.getString(KEY_WIFI_SSID, null),
+            password = prefs.getString(KEY_WIFI_PASSWORD, null).orEmpty(),
+            security = WifiSecurity.entries.firstOrNull { it.name == prefs.getString(KEY_WIFI_SECURITY, null) }
+                ?: WifiSecurity.Wpa,
+            hidden = prefs.getBoolean(KEY_WIFI_HIDDEN, false),
+        ),
     )
 
     private companion object {
@@ -180,6 +196,10 @@ class KioskStore(context: Context) {
         const val KEY_KITCHEN_HIDDEN_PEOPLE = "kitchen_hidden_people"
         const val KEY_KITCHEN_WEATHER = "kitchen_weather"
         const val KEY_KITCHEN_STATUS = "kitchen_status"
+        const val KEY_WIFI_SSID = "wifi_ssid"
+        const val KEY_WIFI_PASSWORD = "wifi_password"
+        const val KEY_WIFI_SECURITY = "wifi_security"
+        const val KEY_WIFI_HIDDEN = "wifi_hidden"
         const val KEY_KITCHEN_SHORTCUT_NAMES = "kitchen_shortcut_names"
         const val KEY_KITCHEN_SHORTCUT_ICONS = "kitchen_shortcut_icons"
     }

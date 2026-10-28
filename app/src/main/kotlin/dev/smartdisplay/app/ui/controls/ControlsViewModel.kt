@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.smartdisplay.app.SmartDisplayApp
 import dev.smartdisplay.app.ha.NotConnectedException
+import dev.smartdisplay.app.kiosk.GuestConfig
 import java.io.IOException
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -32,7 +33,7 @@ class ControlsViewModel(application: Application) : AndroidViewModel(application
     fun call(call: ServiceCall, name: String) {
         // Guest mode: refuse anything outside the guest's devices, even if a screen offered it.
         val kiosk = app.kiosk.config.value
-        if (kiosk.isGuest && call.entityId !in home.state.value.rooms().guestEntityIds(kiosk.guest)) {
+        if (kiosk.isGuest && call.entityId !in guestTargets(kiosk.guest)) {
             Log.w(TAG, "Refused ${call.domain}.${call.service} on ${call.entityId}: not a guest device")
             _errors.tryEmit(ControlError(name, notConnected = false))
             return
@@ -52,6 +53,13 @@ class ControlsViewModel(application: Application) : AndroidViewModel(application
                 _errors.tryEmit(ControlError(name, notConnected = false))
             }
         }
+    }
+
+    /** A guest's devices, and the remotes of their TVs (which aren't cards of their own). */
+    private fun guestTargets(guest: GuestConfig): Set<String> {
+        val state = home.state.value
+        val devices = state.rooms().guestEntityIds(guest)
+        return devices + devices.mapNotNull { state.tvRemote(it)?.entityId }
     }
 
     private companion object {

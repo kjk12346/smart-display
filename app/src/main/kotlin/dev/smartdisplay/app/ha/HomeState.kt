@@ -59,6 +59,8 @@ data class EntityEntry(
     val hidden: Boolean,
     val disabled: Boolean,
     val category: String?,
+    /** The integration that provides it, such as `cast` or `androidtv_remote`. */
+    val platform: String? = null,
 )
 
 /**
@@ -136,6 +138,7 @@ internal fun parseEntityRegistry(json: JsonElement): Map<String, EntityEntry> = 
         hidden = obj.string("hidden_by") != null,
         disabled = obj.string("disabled_by") != null,
         category = obj.string("entity_category"),
+        platform = obj.string("platform"),
     )
 }.associateBy { it.entityId }
 

@@ -10,6 +10,7 @@ import dev.smartdisplay.app.kiosk.HomeApp
 import dev.smartdisplay.app.kiosk.KioskConfig
 import dev.smartdisplay.app.kiosk.KitchenConfig
 import dev.smartdisplay.app.kiosk.PinCheck
+import dev.smartdisplay.app.kiosk.WifiConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
@@ -59,6 +60,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setWallpaperFolder(folder: MediaItem?) {
         kiosk.setWallpaper(config.value.wallpaper.copy(folderId = folder?.contentId, folderTitle = folder?.title))
     }
+
+    fun setWifi(wifi: WifiConfig) = kiosk.setWifi(wifi)
 
     fun setWallpaperInterval(minutes: Int) {
         kiosk.setWallpaper(config.value.wallpaper.copy(intervalMinutes = minutes))

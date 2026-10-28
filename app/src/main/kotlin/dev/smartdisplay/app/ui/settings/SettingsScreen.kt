@@ -48,7 +48,7 @@ import dev.smartdisplay.app.ui.signin.displayName
 import kotlinx.coroutines.launch
 
 /** The pages of settings, each opened from the list on the first. */
-private enum class SettingsPage { Mode, Kitchen, Display, Alarms, WindDown, Kiosk, Connection }
+private enum class SettingsPage { Mode, Kitchen, Display, Wifi, Alarms, WindDown, Kiosk, Connection }
 
 /**
  * Settings, behind the exit PIN when one is set: a short list of pages (who uses the display, the family dashboard,
@@ -97,6 +97,10 @@ fun SettingsScreen(
                     stringResource(R.string.settings_display_summary),
                 ) { page = SettingsPage.Display }
                 PageRow(
+                    stringResource(R.string.settings_wifi),
+                    kiosk.wifi.ssid?.takeIf { kiosk.wifi.isSet } ?: stringResource(R.string.settings_wifi_none),
+                ) { page = SettingsPage.Wifi }
+                PageRow(
                     stringResource(R.string.settings_alarms),
                     stringResource(R.string.settings_alarms_summary),
                 ) { page = SettingsPage.Alarms }
@@ -139,6 +143,7 @@ fun SettingsScreen(
                 }
                 SettingsPage.Kitchen -> KitchenSettings(kiosk.kitchen, home, viewModel::setKitchen)
                 SettingsPage.Display -> DisplaySettings(kiosk, viewModel) { choosingWallpaper = true }
+                SettingsPage.Wifi -> WifiSettings(kiosk.wifi, viewModel::setWifi)
                 SettingsPage.Alarms -> AlarmSettings(home = home, browse = viewModel::browseMedia)
                 SettingsPage.WindDown -> WindDownSettings(home)
                 SettingsPage.Kiosk -> {
@@ -212,6 +217,7 @@ private fun pageTitle(page: SettingsPage): String = stringResource(
         SettingsPage.Mode -> R.string.settings_mode
         SettingsPage.Kitchen -> R.string.settings_kitchen_page
         SettingsPage.Display -> R.string.settings_display
+        SettingsPage.Wifi -> R.string.settings_wifi
         SettingsPage.Alarms -> R.string.settings_alarms
         SettingsPage.WindDown -> R.string.wind_down_title
         SettingsPage.Kiosk -> R.string.settings_kiosk

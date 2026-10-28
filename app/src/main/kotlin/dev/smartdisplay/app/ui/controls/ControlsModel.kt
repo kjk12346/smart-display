@@ -7,6 +7,7 @@ import kotlin.math.roundToInt
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
@@ -97,11 +98,29 @@ data class MediaInfo(
     val volume: Float?,
     val title: String?,
     val artist: String?,
+    /** A TV (by its device class), which gets power, inputs and a remote. */
+    val isTv: Boolean = false,
+    val canTurnOn: Boolean = false,
+    val canTurnOff: Boolean = false,
+    /** Volume up and down a step at a time, for TVs and receivers that can't set a level. */
+    val canStepVolume: Boolean = false,
+    val canMute: Boolean = false,
+    val muted: Boolean = false,
+    val canSkip: Boolean = false,
+    val sources: List<String> = emptyList(),
+    val source: String? = null,
 )
 
 // media_player supported_features bits.
 private const val MEDIA_PAUSE = 1
 private const val MEDIA_VOLUME_SET = 4
+private const val MEDIA_VOLUME_MUTE = 8
+private const val MEDIA_PREVIOUS = 16
+private const val MEDIA_NEXT = 32
+private const val MEDIA_TURN_ON = 128
+private const val MEDIA_TURN_OFF = 256
+private const val MEDIA_VOLUME_STEP = 1024
+private const val MEDIA_SELECT_SOURCE = 2048
 private const val MEDIA_PLAY = 16384
 
 fun EntityState.mediaInfo(): MediaInfo {
@@ -114,6 +133,19 @@ fun EntityState.mediaInfo(): MediaInfo {
         volume = attributes.number("volume_level")?.toFloat(),
         title = attributes.text("media_title"),
         artist = attributes.text("media_artist") ?: attributes.text("media_album_artist"),
+        isTv = attributes.text("device_class") == "tv",
+        canTurnOn = features and MEDIA_TURN_ON != 0,
+        canTurnOff = features and MEDIA_TURN_OFF != 0,
+        canStepVolume = features and MEDIA_VOLUME_STEP != 0,
+        canMute = features and MEDIA_VOLUME_MUTE != 0,
+        muted = (attributes["is_volume_muted"] as? JsonPrimitive)?.content == "true",
+        canSkip = features and (MEDIA_PREVIOUS or MEDIA_NEXT) != 0,
+        sources = if (features and MEDIA_SELECT_SOURCE != 0) {
+            (attributes["source_list"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.orEmpty()
+        } else {
+            emptyList()
+        },
+        source = attributes.text("source"),
     )
 }
 
@@ -176,6 +208,20 @@ object Calls {
     fun previousTrack(entityId: String) = ServiceCall("media_player", "media_previous_track", entityId)
 
     fun nextTrack(entityId: String) = ServiceCall("media_player", "media_next_track", entityId)
+
+    fun power(entityId: String, on: Boolean) =
+        ServiceCall("media_player", if (on) "turn_on" else "turn_off", entityId)
+
+    fun volumeStep(entityId: String, up: Boolean) =
+        ServiceCall("media_player", if (up) "volume_up" else "volume_down", entityId)
+
+    fun mute(entityId: String, muted: Boolean) = ServiceCall(
+        "media_player", "volume_mute", entityId, buildJsonObject { put("is_volume_muted", muted) },
+    )
+
+    fun source(entityId: String, source: String) = ServiceCall(
+        "media_player", "select_source", entityId, buildJsonObject { put("source", source) },
+    )
 
     fun volume(entityId: String, level: Float) = ServiceCall(
         "media_player", "volume_set", entityId, buildJsonObject { put("volume_level", level.coerceIn(0f, 1f)) },

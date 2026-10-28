@@ -51,6 +51,13 @@ internal fun CardSourcesDialog(
         CardType.Buttons -> ButtonsSources(kitchen, home, onKitchenChange, onDismiss)
         CardType.Devices -> DevicesSources(card, home, onCardChange, onDismiss)
         CardType.Weather -> WeatherSourceDialog(kitchen, home, onKitchenChange, onDismiss)
+        // Set in Settings, with the network's password; nothing to choose here.
+        CardType.Wifi -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.card_wifi)) },
+            text = { Text(stringResource(R.string.card_wifi_sources)) },
+            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_done)) } },
+        )
         CardType.Sensors -> ChoiceDialog(
             title = stringResource(R.string.card_sensors_choose),
             items = home.choosable("sensor", "binary_sensor").map { it.entityId to it.friendlyName },

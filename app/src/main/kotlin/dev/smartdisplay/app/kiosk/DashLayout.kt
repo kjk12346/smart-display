@@ -23,6 +23,7 @@ enum class CardType(val single: Boolean) {
     NowPlaying(false),
     Camera(false),
     Weather(true),
+    Wifi(true),
 }
 
 /** A grid of cells the cards snap to: one for landscape, one for portrait. */
@@ -233,6 +234,7 @@ private val DEFAULT_SIZES = mapOf(
     CardType.NowPlaying to ((3 to 4) to (3 to 4)),
     CardType.Camera to ((4 to 4) to (6 to 4)),
     CardType.Weather to ((4 to 4) to (6 to 4)),
+    CardType.Wifi to ((3 to 3) to (3 to 3)),
 )
 
 /** The layout as JSON, for [KioskStore]. */

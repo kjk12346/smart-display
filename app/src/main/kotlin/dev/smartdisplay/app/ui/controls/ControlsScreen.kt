@@ -53,6 +53,8 @@ import dev.smartdisplay.app.R
 import dev.smartdisplay.app.ha.ConnectionStatus
 import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.kiosk.GuestConfig
+import dev.smartdisplay.app.ui.common.WifiDialog
+import dev.smartdisplay.app.kiosk.WifiConfig
 import dev.smartdisplay.app.ui.common.ReturnWhenIdle
 import kotlinx.coroutines.delay
 import dev.smartdisplay.app.ui.winddown.WindDownButton
@@ -76,6 +78,8 @@ private val Room.key: String get() = id ?: OTHER_ROOM_KEY
 fun ControlsScreen(
     home: HomeState,
     guest: GuestConfig?,
+    /** The Wi-Fi to offer guests as a QR code, if one is set; only shown in guest mode. */
+    wifi: WifiConfig?,
     onDone: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAlarms: () -> Unit,
@@ -108,7 +112,7 @@ fun ControlsScreen(
                     val guestRooms = remember(rooms, guest) { rooms.forGuest(guest) }
                     Column {
                         val title = guestRooms.firstOrNull { it.id == guest.areaId }?.name
-                        Header(title, home, onDone, onOpenSettings, onOpenAlarms)
+                        Header(title, home, onDone, onOpenSettings, onOpenAlarms, wifi = wifi?.takeIf { it.isSet })
                         GuestGrid(home, guestRooms, ownAreaId = guest.areaId, onCall = call)
                     }
                 } else if (maxWidth >= SIDE_LIST_MIN_WIDTH) {
@@ -148,7 +152,9 @@ private fun Header(
     onDone: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAlarms: () -> Unit,
+    wifi: WifiConfig? = null,
 ) {
+    var showingWifi by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -165,6 +171,9 @@ private fun Header(
                 )
             }
         }
+        if (wifi != null) {
+            TextButton(onClick = { showingWifi = true }) { Text(stringResource(R.string.wifi_button)) }
+        }
         WindDownButton()
         TextButton(onClick = onOpenAlarms) { Text(stringResource(R.string.alarms_button)) }
         TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_eyebrow)) }
@@ -172,6 +181,7 @@ private fun Header(
             Text(stringResource(R.string.settings_done))
         }
     }
+    if (showingWifi && wifi != null) WifiDialog(wifi, onDismiss = { showingWifi = false })
 }
 
 @Composable
@@ -228,7 +238,9 @@ private fun RoomGrid(home: HomeState, room: Room?, onCall: (ServiceCall, String)
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(room.controls, key = { it.entityId }) { control ->
-            ControlCard(control, home.config?.temperatureUnit) { onCall(it, control.name) }
+            ControlCard(control, home.config?.temperatureUnit, home.tvRemote(control.entityId)) {
+                onCall(it, control.name)
+            }
         }
     }
 }
@@ -265,7 +277,9 @@ private fun GuestGrid(home: HomeState, rooms: List<Room>, ownAreaId: String?, on
                 }
             }
             items(room.controls, key = { it.entityId }) { control ->
-                ControlCard(control, home.config?.temperatureUnit) { onCall(it, control.name) }
+                ControlCard(control, home.config?.temperatureUnit, home.tvRemote(control.entityId)) {
+                    onCall(it, control.name)
+                }
             }
         }
     }

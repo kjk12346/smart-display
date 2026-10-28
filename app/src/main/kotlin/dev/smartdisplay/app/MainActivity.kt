@@ -333,6 +333,7 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                             onEditRequest = { if (kiosk.hasPin) askingEditPin = true else editing = true },
                             onEditDone = { editing = false },
                             onKitchenChange = app.kiosk::setKitchen,
+                            wifi = kiosk.wifi,
                         )
                     }
                     // Left alone, it gives way to the clock: soon at night, and by day after the screensaver time,
@@ -349,6 +350,7 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                 Screen.Controls -> ControlsScreen(
                     home = home,
                     guest = kiosk.guest.takeIf { kiosk.isGuest },
+                    wifi = kiosk.wifi,
                     onDone = { screen = rest },
                     onOpenSettings = openSettings,
                     onOpenAlarms = { screen = Screen.Alarms },

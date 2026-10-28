@@ -47,7 +47,9 @@ import dev.smartdisplay.app.ui.controls.Calls
 import dev.smartdisplay.app.ui.controls.ControlCard
 import dev.smartdisplay.app.ui.controls.PlayPauseGlyph
 import dev.smartdisplay.app.ui.controls.ServiceCall
+import dev.smartdisplay.app.ui.controls.SkipGlyph
 import dev.smartdisplay.app.ui.controls.mediaInfo
+import dev.smartdisplay.app.ui.controls.tvRemote
 import kotlinx.coroutines.delay
 
 /** How often a camera card fetches a new picture. */
@@ -79,7 +81,9 @@ internal fun DevicesCard(
                     Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                         row.forEach { control ->
                             Box(Modifier.width(width)) {
-                                ControlCard(control, home.config?.temperatureUnit) { onCall(it, control.name) }
+                                ControlCard(control, home.config?.temperatureUnit, home.tvRemote(control.entityId)) {
+                                    onCall(it, control.name)
+                                }
                             }
                         }
                     }
@@ -192,28 +196,6 @@ internal fun NowPlayingCard(
                 }
             }
         }
-    }
-}
-
-/** A triangle against a bar: skip to the next track, or (pointing left) back to the previous one. */
-@Composable
-private fun SkipGlyph(forward: Boolean) {
-    val color = LocalContentColor.current
-    Canvas(Modifier.size(20.dp)) {
-        val w = size.width
-        val h = size.height
-        val flip = { x: Float -> if (forward) x else w - x }
-        drawPath(
-            Path().apply {
-                moveTo(flip(w * 0.1f), h * 0.1f)
-                lineTo(flip(w * 0.72f), h * 0.5f)
-                lineTo(flip(w * 0.1f), h * 0.9f)
-                close()
-            },
-            color,
-        )
-        val barX = if (forward) w * 0.74f else w * 0.08f
-        drawRect(color, topLeft = Offset(barX, h * 0.1f), size = Size(w * 0.18f, h * 0.8f))
     }
 }
 

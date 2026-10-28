@@ -84,6 +84,7 @@ import dev.smartdisplay.app.kiosk.Grid
 import dev.smartdisplay.app.kiosk.KitchenConfig
 import dev.smartdisplay.app.kiosk.TALL_GRID
 import dev.smartdisplay.app.kiosk.WIDE_GRID
+import dev.smartdisplay.app.kiosk.WifiConfig
 import dev.smartdisplay.app.kiosk.WallpaperConfig
 import dev.smartdisplay.app.kiosk.personColors
 import dev.smartdisplay.app.ui.ambient.AmbientViewModel
@@ -138,6 +139,8 @@ fun DashboardScreen(
     onEditRequest: () -> Unit,
     onEditDone: () -> Unit,
     onKitchenChange: (KitchenConfig) -> Unit,
+    /** The Wi-Fi guests join, for the Wi-Fi card. */
+    wifi: WifiConfig = WifiConfig(),
     ambient: AmbientViewModel = viewModel(),
     viewModel: DashboardViewModel = viewModel(),
     controls: ControlsViewModel = viewModel(),
@@ -414,6 +417,7 @@ fun DashboardScreen(
             CardType.NowPlaying -> NowPlayingCard(card, home, baseUrl, onCall, modifier, bounded)
             CardType.Camera -> CameraCard(card, home, baseUrl, modifier, bounded)
             CardType.Weather -> WeatherCard(weatherEntity, hours, allDays, sun, now, modifier, bounded)
+            CardType.Wifi -> WifiCard(wifi, modifier, bounded)
         }
     }
 
@@ -627,6 +631,7 @@ private fun CardType.label(): Int = when (this) {
     CardType.NowPlaying -> R.string.card_now_playing
     CardType.Camera -> R.string.card_camera
     CardType.Weather -> R.string.card_weather
+    CardType.Wifi -> R.string.card_wifi
 }
 
 private fun CardType.description(): Int = when (this) {
@@ -638,6 +643,7 @@ private fun CardType.description(): Int = when (this) {
     CardType.NowPlaying -> R.string.card_now_playing_about
     CardType.Camera -> R.string.card_camera_about
     CardType.Weather -> R.string.card_weather_about
+    CardType.Wifi -> R.string.card_wifi_about
 }
 
 /** How tall the tall grid is while arranging cards on a phone. */

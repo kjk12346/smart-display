@@ -76,6 +76,22 @@ Home Assistant.
   Sleep API, ~10 min updates) shows stirring. Health Connect only gives sleep duration after the night, so true
   light-sleep detection isn't available through Home Assistant.
 
+## Guest Wi-Fi and TV controls (added 2026-10-28)
+
+- **Guest Wi-Fi:** Settings > Guest Wi-Fi: network name, security (WPA, WEP or none), password, hidden; saved with
+  Save, with a preview QR to try. Stored as typed (`kiosk/WifiConfig.kt`, `KioskStore.setWifi`): it's shown to
+  anyone in the room anyway. `wifiQrText` makes the standard `WIFI:T:WPA;S:…;P:…;;` text (escaping `\ ; , : "`);
+  `ui/common/WifiQr.kt` draws it with ZXing core (`QrCode`, black on white). Shown as a Wi-Fi button on a guest
+  room's controls header (`WifiDialog`) and as a Wi-Fi card for the dashboard (`WifiCard`, one).
+- **TV controls:** a media player with `device_class: tv`, or one whose integration has a remote this app knows
+  (`ui/controls/TvRemote.kt`), gets a Controls button (and its name opens them): power, inputs (`source_list`),
+  the arrows / OK / Back / Home, play/pause and skip, volume down / mute / up (steps, else ±5%) (`TvControls.kt`).
+  Remote keys: `remote.send_command` on the TV device's `remote.*` for Android TV Remote, Roku, Apple TV and
+  Samsung; `webostv.button` (LG) and `androidtv.adb_command` (ADB) on the player itself. A guest may also use the
+  remotes of their room's TVs (`ControlsViewModel.guestTargets`). Made for guests who cast from their phone and
+  then want to pause or turn it down. No TV to check against yet (a guest-room TV is planned); the Wi-Fi QR and the
+  TV controls are unit-tested only.
+
 ## Family / kitchen display (added 2026-10-09)
 
 - A third display type (Settings > "Who uses this display"). By day a dashboard (`ui/dashboard/`): clock, weather
