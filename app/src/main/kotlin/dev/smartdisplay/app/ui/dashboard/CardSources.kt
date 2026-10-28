@@ -57,6 +57,7 @@ internal fun CardSourcesDialog(
             onDismiss = onDismiss,
         )
         CardType.Devices -> DevicesSources(card, home, onCardChange, onDismiss)
+        CardType.Weather -> WeatherSourceDialog(kitchen, home, onKitchenChange, onDismiss)
         CardType.Sensors -> ChoiceDialog(
             title = stringResource(R.string.card_sensors_choose),
             items = home.choosable("sensor", "binary_sensor").map { it.entityId to it.friendlyName },

@@ -130,6 +130,14 @@
     <string name="card_sensors_choose">Choose sensors</string>
     <string name="card_camera_choose">Choose a camera</string>
     <string name="card_player_choose">Choose a speaker or TV</string>
+    <string name="card_weather">Weather</string>
+    <string name="card_weather_about">Now, a graph of the next 12 hours with the chance of rain, and the days ahead.</string>
+    <string name="card_weather_none">No weather in Home Assistant yet. Add a weather integration, such as Met.no.</string>
+    <string name="weather_feels">Feels %1$s</string>
+    <string name="weather_wind">Wind %1$s</string>
+    <string name="weather_humidity">Humidity %1$d%%</string>
+    <string name="weather_sunset">Sunset %1$s</string>
+    <string name="weather_sunrise">Sunrise %1$s</string>
     <string name="card_weather_choose">Weather to show</string>
     <string name="card_weather_first">Automatic (the first one)</string>
     <string name="sensor_open">Open</string>

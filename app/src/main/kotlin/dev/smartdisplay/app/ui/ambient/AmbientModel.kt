@@ -3,6 +3,7 @@ package dev.smartdisplay.app.ui.ambient
 import dev.smartdisplay.app.ha.EntityState
 import dev.smartdisplay.app.ha.HomeState
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -93,6 +94,42 @@ fun parseForecastDays(
     }.distinctBy { it.date }
 }
 
+/** One hour of a forecast: its start, condition, temperature and chance of rain (0–100). */
+data class ForecastHour(
+    val time: LocalDateTime,
+    val condition: String?,
+    val temperature: Double?,
+    val precipitationChance: Int?,
+)
+
+/**
+ * Reads every hour from a `weather.get_forecasts` (hourly) result, in [zone]'s local time. Hours that can't be read
+ * are skipped.
+ */
+fun parseForecastHours(
+    result: JsonElement,
+    entityId: String,
+    zone: ZoneId = ZoneId.systemDefault(),
+): List<ForecastHour> {
+    val response = (result as? JsonObject)?.get("response") as? JsonObject ?: return emptyList()
+    val forecast = (response[entityId] as? JsonObject)?.get("forecast") as? JsonArray ?: return emptyList()
+    return forecast.mapNotNull { item ->
+        val hour = item as? JsonObject ?: return@mapNotNull null
+        val text = (hour["datetime"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return@mapNotNull null
+        val time = runCatching { OffsetDateTime.parse(text).atZoneSameInstant(zone).toLocalDateTime() }
+            .getOrNull() ?: return@mapNotNull null
+        ForecastHour(
+            time = time,
+            condition = (hour["condition"] as? JsonPrimitive)?.takeIf { it.isString }?.content,
+            temperature = (hour["temperature"] as? JsonPrimitive)?.doubleOrNull,
+            precipitationChance = (hour["precipitation_probability"] as? JsonPrimitive)?.doubleOrNull?.roundToInt(),
+        )
+    }.distinctBy { it.time }.sortedBy { it.time }
+}
+
+/** The hours from the one after [now] on: the forecast's coming hours, not the one already under way. */
+fun List<ForecastHour>.comingAfter(now: LocalDateTime): List<ForecastHour> = filter { it.time.isAfter(now) }
+
 /** Whole degrees with a degree sign; the unit is left out, as on most displays. */
 fun formatTemperature(value: Double): String = "${value.roundToInt()}°"
 
@@ -105,6 +142,27 @@ val QUIET_END: LocalTime = LocalTime.of(7, 0)
 
 /** True when Home Assistant's sun entity says the sun is down, for night versions of weather icons. */
 fun HomeState.sunIsDown(): Boolean? = entities["sun.sun"]?.state?.let { it == "below_horizon" }
+
+/** The sun's next rising and setting, in [zone]'s local time, from Home Assistant's `sun.sun`; null if unknown. */
+data class SunTimes(val nextRising: LocalDateTime, val nextSetting: LocalDateTime) {
+    /**
+     * Whether the sun is down at [time], for night icons on forecast hours: between the next setting and the next
+     * rising, or (while it's already down) before the next rising. Good for the coming day, which is all it's for.
+     */
+    fun isNight(time: LocalDateTime): Boolean = if (nextSetting.isBefore(nextRising)) {
+        !time.isBefore(nextSetting) && time.isBefore(nextRising)
+    } else {
+        time.isBefore(nextRising) || !time.isBefore(nextSetting)
+    }
+}
+
+fun HomeState.sunTimes(zone: ZoneId = ZoneId.systemDefault()): SunTimes? {
+    val sun = entities["sun.sun"] ?: return null
+    fun at(key: String) = (sun.attributes[key] as? JsonPrimitive)?.takeIf { it.isString }?.content?.let {
+        runCatching { OffsetDateTime.parse(it).atZoneSameInstant(zone).toLocalDateTime() }.getOrNull()
+    }
+    return SunTimes(at("next_rising") ?: return null, at("next_setting") ?: return null)
+}
 
 /**
  * Where to nudge the whole screen this minute, in dp, so no pixel shows the same thing all day. A fixed tour of

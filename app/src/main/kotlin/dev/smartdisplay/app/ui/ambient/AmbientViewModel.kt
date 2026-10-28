@@ -30,6 +30,11 @@ class AmbientViewModel(application: Application) : AndroidViewModel(application)
     /** The days ahead, and the weather entity they belong to, for the kitchen dashboard. */
     val forecastDays: StateFlow<Pair<String, List<ForecastDay>>?> = _forecastDays.asStateFlow()
 
+    private val _forecastHours = MutableStateFlow<Pair<String, List<ForecastHour>>?>(null)
+
+    /** The hours ahead, and the weather entity they belong to; empty for integrations without hourly forecasts. */
+    val forecastHours: StateFlow<Pair<String, List<ForecastHour>>?> = _forecastHours.asStateFlow()
+
     private var fetchedAt = 0L
     private var fetchedFor: String? = null
 
@@ -70,6 +75,7 @@ class AmbientViewModel(application: Application) : AndroidViewModel(application)
         )
         parseDailyForecast(result, entityId)?.let { _forecast.value = entityId to it }
         _forecastDays.value = entityId to parseForecastDays(result, entityId)
+        _forecastHours.value = entityId to fetchHours(entityId)
         fetchedAt = System.currentTimeMillis()
         fetchedFor = entityId
         true
@@ -77,6 +83,21 @@ class AmbientViewModel(application: Application) : AndroidViewModel(application)
         // Includes a weather integration without daily forecasts (Home Assistant answers with an error).
         Log.w(TAG, "Forecast for $entityId failed", e)
         false
+    }
+
+    /** The hourly forecast; empty if the integration has none (Home Assistant answers with an error). */
+    private suspend fun fetchHours(entityId: String): List<ForecastHour> = try {
+        val result = home.callService(
+            domain = "weather",
+            service = "get_forecasts",
+            data = buildJsonObject { put("type", "hourly") },
+            target = buildJsonObject { put("entity_id", entityId) },
+            returnResponse = true,
+        )
+        parseForecastHours(result, entityId)
+    } catch (e: IOException) {
+        Log.i(TAG, "No hourly forecast for $entityId", e)
+        emptyList()
     }
 
     /**

@@ -83,11 +83,13 @@ import dev.smartdisplay.app.ui.ambient.KeepWeatherAndPhotosFresh
 import dev.smartdisplay.app.ui.ambient.WallpaperBackground
 import dev.smartdisplay.app.ui.ambient.WeatherIcon
 import dev.smartdisplay.app.ui.ambient.burnInOffset
+import dev.smartdisplay.app.ui.ambient.comingAfter
 import dev.smartdisplay.app.ui.ambient.conditionLabel
 import dev.smartdisplay.app.ui.ambient.formatTemperature
 import dev.smartdisplay.app.ui.ambient.primaryWeatherEntity
 import dev.smartdisplay.app.ui.ambient.rememberNextAlarmText
 import dev.smartdisplay.app.ui.ambient.sunIsDown
+import dev.smartdisplay.app.ui.ambient.sunTimes
 import dev.smartdisplay.app.ui.ambient.toCurrentWeather
 import dev.smartdisplay.app.ui.common.rememberMinuteClock
 import dev.smartdisplay.app.ui.controls.ControlsViewModel
@@ -133,6 +135,7 @@ fun DashboardScreen(
     val weatherEntity = home.primaryWeatherEntity(kitchen.weatherEntity)
     KeepWeatherAndPhotosFresh(ambient, home, weatherEntity?.entityId, wallpaperConfig, photos = true)
     val forecastDays by ambient.forecastDays.collectAsStateWithLifecycle()
+    val forecastHours by ambient.forecastHours.collectAsStateWithLifecycle()
     val wallpaper by ambient.wallpaper.collectAsStateWithLifecycle()
     val runs by viewModel.runs.collectAsStateWithLifecycle()
     val calendarIds = remember(home.entities, home.registry, kitchen.hiddenCalendars) {
@@ -148,9 +151,12 @@ fun DashboardScreen(
     val now by rememberMinuteClock()
     val nextAlarm = rememberNextAlarmText(now)
 
-    val days = forecastDays?.takeIf { it.first == weatherEntity?.entityId }?.second.orEmpty()
+    val allDays = forecastDays?.takeIf { it.first == weatherEntity?.entityId }?.second.orEmpty()
         .filter { !it.date.isBefore(now.toLocalDate()) }
-        .take(FORECAST_DAYS)
+    val days = allDays.take(FORECAST_DAYS)
+    // Empty for weather integrations without an hourly forecast; the header then shows the days.
+    val hours = forecastHours?.takeIf { it.first == weatherEntity?.entityId }?.second.orEmpty().comingAfter(now)
+    val sun = home.sunTimes()
     val photoUrl = wallpaper?.takeIf { it.folderId == wallpaperConfig.folderId }?.url
     val names = home.entities
     val people = home.people()
@@ -190,13 +196,25 @@ fun DashboardScreen(
                     fontWeight = FontWeight.Light,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
+                // With the hours beside it, today's high and low go here.
+                val today = days.today(now.toLocalDate()).takeIf { hours.isNotEmpty() }
                 Text(
-                    conditionLabel(weather.condition, night),
+                    listOfNotNull(
+                        conditionLabel(weather.condition, night),
+                        today?.let { day ->
+                            listOfNotNull(day.high, day.low).joinToString(" / ") { formatTemperature(it) }
+                                .takeIf { it.isNotEmpty() }
+                        },
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
+    }
+    // The next hours where the integration gives them, else the days ahead.
+    val forecast: @Composable () -> Unit = {
+        if (hours.isNotEmpty()) HourlyStrip(hours, sun) else ForecastStrip(days, today = now.toLocalDate())
     }
     var choosingWeather by remember { mutableStateOf(false) }
     var choosingStatus by remember { mutableStateOf(false) }
@@ -246,7 +264,7 @@ fun DashboardScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         currentWeather()
-                        ForecastStrip(days, today = now.toLocalDate())
+                        forecast()
                     }
                     if (statusChips.isNotEmpty()) StatusBar(statusChips)
                 }
@@ -261,7 +279,7 @@ fun DashboardScreen(
                     Spacer(Modifier.weight(1f))
                     currentWeather()
                 }
-                ForecastStrip(days, today = now.toLocalDate())
+                forecast()
                 if (statusChips.isNotEmpty()) StatusBar(statusChips)
                 FlowRow(verticalArrangement = Arrangement.Center) {
                     navButtons(TALL_GRID)
@@ -327,6 +345,7 @@ fun DashboardScreen(
             CardType.Sensors -> SensorsCard(card, home, modifier, bounded)
             CardType.NowPlaying -> NowPlayingCard(card, home, baseUrl, onCall, modifier, bounded)
             CardType.Camera -> CameraCard(card, home, baseUrl, modifier, bounded)
+            CardType.Weather -> WeatherCard(weatherEntity, hours, allDays, sun, now, modifier, bounded)
         }
     }
 
@@ -521,6 +540,7 @@ private fun CardType.label(): Int = when (this) {
     CardType.Sensors -> R.string.card_sensors
     CardType.NowPlaying -> R.string.card_now_playing
     CardType.Camera -> R.string.card_camera
+    CardType.Weather -> R.string.card_weather
 }
 
 private fun CardType.description(): Int = when (this) {
@@ -531,6 +551,7 @@ private fun CardType.description(): Int = when (this) {
     CardType.Sensors -> R.string.card_sensors_about
     CardType.NowPlaying -> R.string.card_now_playing_about
     CardType.Camera -> R.string.card_camera_about
+    CardType.Weather -> R.string.card_weather_about
 }
 
 /** How tall the tall grid is while arranging cards on a phone. */
@@ -552,9 +573,16 @@ private const val HEADER_FADE_PX = 500f
 private const val CARD_ALPHA = 0.85f
 
 @Composable
-private fun ForecastStrip(days: List<ForecastDay>, today: LocalDate) {
+internal fun ForecastStrip(
+    days: List<ForecastDay>,
+    today: LocalDate,
+    arrangement: Arrangement.Horizontal = Arrangement.spacedBy(16.dp),
+) {
     val locale = LocalConfiguration.current.locales[0]
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+    Row(
+        horizontalArrangement = arrangement,
+        modifier = if (arrangement == Arrangement.SpaceBetween) Modifier.fillMaxWidth() else Modifier,
+    ) {
         days.forEach { day ->
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(

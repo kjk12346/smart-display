@@ -123,6 +123,12 @@ Home Assistant.
   ("Status bar"; `KitchenConfig.statusEntities`). Sensors and alarm panels always show; binary sensors, locks and
   covers only while open, unlocked or on (`statusChip` in `CardModels.kt`). Safety classes (smoke, leak, problem…),
   jammed locks and a triggered alarm are tinted as alerts. Not yet checked on a device with chips chosen.
+- **Weather (2026-10-28, the owner chose "hours" plus a card):** the header shows now (with today's high / low) and
+  the next 6 hours (`HourlyStrip` in `Weather.kt`; `weather.get_forecasts` `type: hourly`, fetched with the daily one
+  in `AmbientViewModel`); integrations without hourly forecasts fall back to the days. Night icons per hour from
+  `sun.sun`'s next rising / setting (`SunTimes`). A Weather card (one, sources = the dashboard's weather entity):
+  now with feels-like, wind, humidity and the next sunrise or sunset, a 12-hour graph (temperature line, rain-chance
+  bars), then the days. Header checked on the 15.6" tablet (Met.no, portrait); the card not yet on a device.
 - **Burn-in:** by day the dashboard gives way to the clock over the photos (the ambient screen, which already drifts)
   after `KitchenConfig.screensaverMinutes` untouched (Settings, default 10, or never); at night after 2 minutes, as
   before. A tap brings the dashboard back. The dashboard itself also drifts by `burnInOffset` each minute.
