@@ -27,9 +27,13 @@ private val ATTENTION = setOf(StatusWord.Open, StatusWord.Unlocked, StatusWord.D
 /** The status bar: a chip for each of [chips], wrapping onto a second line if it must. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun StatusBar(chips: List<StatusChip>, modifier: Modifier = Modifier) {
+internal fun StatusBar(
+    chips: List<StatusChip>,
+    modifier: Modifier = Modifier,
+    arrangement: Arrangement.Horizontal = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+) {
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        horizontalArrangement = arrangement,
         verticalArrangement = Arrangement.spacedBy(8.dp),
         maxLines = 2,
         modifier = modifier,

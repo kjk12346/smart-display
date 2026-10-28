@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,20 +49,25 @@ import kotlin.math.roundToInt
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 
-/** How many hours the header shows, and the weather card's graph. */
-private const val HEADER_HOURS = 6
+/** How many hours the header shows (when there's room), and the weather card's graph. */
+internal const val HEADER_HOURS = 6
 private const val GRAPH_HOURS = 12
 
 /** A chance of rain worth showing, in percent. */
 private const val RAIN_WORTH_SHOWING = 20
 
-/** The next few hours, for the header: time, icon, temperature and, if it might rain, the chance. */
+/** Each hour's and day's width in the forecast strips, and the gap between them. */
+internal val HOUR_WIDTH = 52.dp
+internal val DAY_WIDTH = 64.dp
+internal val FORECAST_GAP = 12.dp
+
+/** The next [hours], for the header: time, icon, temperature and, if it might rain, the chance. */
 @Composable
 internal fun HourlyStrip(hours: List<ForecastHour>, sun: SunTimes?) {
     val format = rememberHourFormat()
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        hours.take(HEADER_HOURS).forEach { hour ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Row(horizontalArrangement = Arrangement.spacedBy(FORECAST_GAP)) {
+        hours.forEach { hour ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(HOUR_WIDTH)) {
                 Text(
                     hour.time.format(format),
                     style = MaterialTheme.typography.labelLarge,

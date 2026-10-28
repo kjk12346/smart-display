@@ -129,6 +129,9 @@ Home Assistant.
   `sun.sun`'s next rising / setting (`SunTimes`). A Weather card (one, sources = the dashboard's weather entity):
   now with feels-like, wind, humidity and the next sunrise or sunset, a 12-hour graph (temperature line, rain-chance
   bars), then the days. Header checked on the 15.6" tablet (Met.no, portrait); the card not yet on a device.
+- **Header in portrait (tablets ≥ 600 dp):** two rows: clock, weather and as many hours as fit (fixed-width
+  columns, `fitting()`), then the status chips beside the buttons (one line of buttons when there are no chips, two
+  by two when there are). Phones still give the forecast and the chips their own lines.
 - **Burn-in:** by day the dashboard gives way to the clock over the photos (the ambient screen, which already drifts)
   after `KitchenConfig.screensaverMinutes` untouched (Settings, default 10, or never); at night after 2 minutes, as
   before. A tap brings the dashboard back. The dashboard itself also drifts by `burnInOffset` each minute.

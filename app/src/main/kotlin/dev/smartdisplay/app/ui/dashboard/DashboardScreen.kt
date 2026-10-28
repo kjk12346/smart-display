@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -212,9 +213,14 @@ fun DashboardScreen(
             }
         }
     }
-    // The next hours where the integration gives them, else the days ahead.
-    val forecast: @Composable () -> Unit = {
-        if (hours.isNotEmpty()) HourlyStrip(hours, sun) else ForecastStrip(days, today = now.toLocalDate())
+    // The next hours where the integration gives them, else the days ahead; as many as fit in [width], if given.
+    val forecast: @Composable (width: Dp?) -> Unit = { width ->
+        if (hours.isNotEmpty()) {
+            val count = width?.let { fitting(it, HOUR_STEP).coerceAtMost(HEADER_HOURS) } ?: HEADER_HOURS
+            HourlyStrip(hours.take(count), sun)
+        } else {
+            ForecastStrip(days.take(width?.let { fitting(it, DAY_STEP) } ?: days.size), today = now.toLocalDate())
+        }
     }
     var choosingWeather by remember { mutableStateOf(false) }
     var choosingStatus by remember { mutableStateOf(false) }
@@ -251,8 +257,8 @@ fun DashboardScreen(
         }
     }
     val statusChips = home.statusChips(kitchen.statusEntities)
-    // Wide: one row, with the status chips under the weather. Narrow: the clock and weather, then the forecast, the
-    // status chips and the buttons, each on its own line.
+    // Wide: one row, with the status chips under the weather. Portrait tablets: the clock, weather and as many hours
+    // as fit, then the status chips beside the buttons. Phones: the forecast and the chips get lines of their own.
     val header: @Composable (wide: Boolean, clock: Dp) -> Unit = { wide, clock ->
         if (wide) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -264,7 +270,7 @@ fun DashboardScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         currentWeather()
-                        forecast()
+                        forecast(null)
                     }
                     if (statusChips.isNotEmpty()) StatusBar(statusChips)
                 }
@@ -273,17 +279,47 @@ fun DashboardScreen(
                 doneButton()
             }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Clock(now, nextAlarm, size = clock, alignment = Alignment.Start)
-                    Spacer(Modifier.weight(1f))
-                    currentWeather()
-                }
-                forecast()
-                if (statusChips.isNotEmpty()) StatusBar(statusChips)
-                FlowRow(verticalArrangement = Arrangement.Center) {
-                    navButtons(TALL_GRID)
-                    doneButton()
+            BoxWithConstraints {
+                val width = maxWidth
+                val roomy = width >= 600.dp
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Clock(now, nextAlarm, size = clock, alignment = Alignment.Start)
+                        Spacer(if (roomy) Modifier.width(24.dp) else Modifier.weight(1f))
+                        currentWeather()
+                        if (roomy) {
+                            // Measured after the rest of the row, so it knows just how many hours fit.
+                            BoxWithConstraints(Modifier.weight(1f)) {
+                                val room = maxWidth
+                                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                                    forecast(room)
+                                }
+                            }
+                        }
+                    }
+                    if (!roomy) {
+                        forecast(width)
+                        if (statusChips.isNotEmpty()) StatusBar(statusChips, arrangement = Arrangement.Start)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        if (roomy && statusChips.isNotEmpty()) {
+                            StatusBar(
+                                statusChips,
+                                arrangement = Arrangement.Start,
+                                modifier = Modifier.weight(1f).padding(end = 16.dp),
+                            )
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                        }
+                        // In one line, unless chips beside them need the room.
+                        FlowRow(
+                            maxItemsInEachRow = if (roomy && statusChips.isNotEmpty()) 2 else Int.MAX_VALUE,
+                            horizontalArrangement = Arrangement.End,
+                        ) {
+                            navButtons(TALL_GRID)
+                        }
+                        doneButton()
+                    }
                 }
             }
         }
@@ -566,6 +602,13 @@ internal fun dashCardColor(): Color =
     MaterialTheme.colorScheme.surfaceContainer.let { if (LocalOverPhoto.current) it.copy(alpha = CARD_ALPHA) else it }
 
 private const val FORECAST_DAYS = 5
+
+/** How much width each hour and day of the header's forecast takes, with the gap after it. */
+private val HOUR_STEP = HOUR_WIDTH + FORECAST_GAP
+private val DAY_STEP = DAY_WIDTH + FORECAST_GAP
+
+/** How many forecast columns [step] wide fit in [width]. */
+private fun fitting(width: Dp, step: Dp): Int = ((width + FORECAST_GAP) / step).toInt().coerceAtLeast(0)
 private const val DRIFT_MS = 2_000
 private const val PHOTO_DIM = 0.45f
 private const val PHOTO_DIM_TOP = 0.65f
@@ -576,7 +619,7 @@ private const val CARD_ALPHA = 0.85f
 internal fun ForecastStrip(
     days: List<ForecastDay>,
     today: LocalDate,
-    arrangement: Arrangement.Horizontal = Arrangement.spacedBy(16.dp),
+    arrangement: Arrangement.Horizontal = Arrangement.spacedBy(FORECAST_GAP),
 ) {
     val locale = LocalConfiguration.current.locales[0]
     Row(
@@ -584,7 +627,7 @@ internal fun ForecastStrip(
         modifier = if (arrangement == Arrangement.SpaceBetween) Modifier.fillMaxWidth() else Modifier,
     ) {
         days.forEach { day ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(DAY_WIDTH)) {
                 Text(
                     if (day.date == today) {
                         stringResource(R.string.forecast_today)
