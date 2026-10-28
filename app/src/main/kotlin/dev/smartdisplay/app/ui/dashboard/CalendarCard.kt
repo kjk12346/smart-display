@@ -139,15 +139,15 @@ internal fun CalendarCard(
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                     val fit = (maxWidth / MIN_DAY_WIDTH).toInt().coerceAtMost(CALENDAR_DAYS)
                     val columns = (maxWidth / AGENDA_COLUMN_WIDTH).toInt().coerceIn(1, MAX_AGENDA_COLUMNS)
-                    val listScroll = Modifier.verticalScroll(rememberScrollState())
-                    when {
-                        agendaView && columns > 1 -> AgendaColumns(shown, now, columns, colorOf, onOpen)
-                        !agendaView && fit >= MIN_GRID_DAYS -> WeekGrid(shown, now, fit, colorOf, onOpen)
-                        else -> Agenda(shown, now, colorOf, onOpen, listScroll)
+                    if (!agendaView && fit >= MIN_GRID_DAYS) {
+                        WeekGrid(shown, now, fit, colorOf, onOpen)
+                    } else {
+                        // Too narrow for the week, the days go in one column of the agenda.
+                        AgendaColumns(shown, now, if (agendaView) columns else 1, colorOf, onOpen, scroll = true)
                     }
                 }
             } else {
-                Agenda(shown, now, colorOf, onOpen, Modifier)
+                AgendaColumns(shown, now, 1, colorOf, onOpen, scroll = false)
             }
         }
     }
@@ -339,9 +339,9 @@ private fun EventChip(
 }
 
 /**
- * The agenda on a wide card: the days ahead with something on, each with its date beside its events, running down
- * [columns] columns (read down, then across) of about the same length. Each event shows once, under its first day
- * still to come.
+ * The agenda: the days ahead with something on, each with its date on the left and its events beside it, running
+ * down [columns] columns (read down, then across) of about the same length. Each event shows once, under its first
+ * day still to come. It [scroll]s by itself in a card of fixed height, and mustn't in a page that scrolls.
  */
 @Composable
 private fun AgendaColumns(
@@ -350,6 +350,7 @@ private fun AgendaColumns(
     columns: Int,
     colorOf: (String) -> Color,
     onOpen: (ShownEvent) -> Unit,
+    scroll: Boolean,
 ) {
     val days = events?.let { agenda(it, now) }
     if (days != null && days.isEmpty()) {
@@ -363,9 +364,13 @@ private fun AgendaColumns(
     val runs = remember(days, columns) { agendaColumns(days.orEmpty(), columns) }
     Row(
         horizontalArrangement = Arrangement.spacedBy(24.dp),
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
+        modifier = if (scroll) {
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        } else {
+            Modifier.fillMaxWidth()
+        },
     ) {
         runs.forEach { run ->
             Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.weight(1f)) {
@@ -380,7 +385,7 @@ private fun AgendaColumns(
     }
 }
 
-/** A day in the wide agenda: its weekday, date (circled today) and maybe month on the left, its events beside. */
+/** A day in the agenda: its weekday, a large date (circled today) and maybe month on the left, its events beside. */
 @Composable
 private fun AgendaDayRow(
     day: AgendaDay,
@@ -392,7 +397,7 @@ private fun AgendaDayRow(
     val isToday = day.date == now.toLocalDate()
     val locale = LocalConfiguration.current.locales[0]
     Row {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(52.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(64.dp)) {
             Text(
                 formatDate(day.date.atStartOfDay(), "EEE", locale),
                 style = MaterialTheme.typography.labelLarge,
@@ -402,13 +407,13 @@ private fun AgendaDayRow(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .padding(top = 2.dp)
-                    .size(36.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent),
             ) {
                 Text(
                     day.date.dayOfMonth.toString(),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineMedium,
                     color = if (isToday) OnPersonColor else MaterialTheme.colorScheme.onSurface,
                 )
             }
@@ -424,7 +429,7 @@ private fun AgendaDayRow(
             verticalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier
                 .weight(1f)
-                .padding(start = 12.dp, top = 4.dp),
+                .padding(start = 12.dp, top = 6.dp),
         ) {
             day.events.forEach { event ->
                 // An all-day event's fill already says so; one over several days says until when.
@@ -434,75 +439,6 @@ private fun AgendaDayRow(
                     agendaTimeLabel(event, day.date, locale)
                 }
                 EventChip(event, time, past = false, colorOf) { onOpen(event) }
-            }
-        }
-    }
-}
-
-/** A list by day, for narrow screens: each event once, under its first day still to come. */
-@Composable
-private fun Agenda(
-    events: List<ShownEvent>?,
-    now: LocalDateTime,
-    colorOf: (String) -> Color,
-    onOpen: (ShownEvent) -> Unit,
-    modifier: Modifier,
-) {
-    val today = now.toLocalDate()
-    val locale = LocalConfiguration.current.locales[0]
-    val days = events?.let { agenda(it, now) }
-    Column(modifier = modifier) {
-        if (days != null && days.isEmpty()) {
-            Text(
-                stringResource(R.string.calendar_agenda_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        days.orEmpty().forEachIndexed { index, day ->
-            Text(
-                when (day.date) {
-                    today -> stringResource(R.string.forecast_today)
-                    today.plusDays(1) -> stringResource(R.string.calendar_tomorrow)
-                    else -> dayName(day.date, locale)
-                },
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = if (index == 0) 0.dp else 12.dp, bottom = 2.dp),
-            )
-            day.events.forEach { event ->
-                // The name gets the whole width, with the time under it.
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onOpen(event) }
-                        .padding(vertical = 5.dp),
-                ) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
-                        modifier = Modifier.padding(top = 7.dp),
-                    ) {
-                        event.owners.forEach { owner ->
-                            Box(Modifier.size(10.dp).clip(CircleShape).background(colorOf(owner)))
-                        }
-                    }
-                    Column(modifier = Modifier.padding(start = 12.dp)) {
-                        Text(
-                            event.summary,
-                            style = MaterialTheme.typography.bodyLarge,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            agendaTimeLabel(event, day.date, locale),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
             }
         }
     }

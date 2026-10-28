@@ -220,7 +220,6 @@
     <string name="sensor_off">Off</string>
     <string name="calendar_everyone">Everyone</string>
     <string name="calendar_family">Family</string>
-    <string name="calendar_tomorrow">Tomorrow</string>
     <string name="calendar_all_day">All day</string>
     <string name="calendar_until">Until %1$s</string>
     <string name="event_untitled">(No title)</string>
