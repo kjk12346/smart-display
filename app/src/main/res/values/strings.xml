@@ -224,7 +224,7 @@
     <string name="settings_needs_pin">Set an exit PIN first (under Kiosk), so there\'s a way out.</string>
     <string name="settings_no_home_chooser">This device doesn\'t let you choose a Home app here. Press Home to see if Android offers it.</string>
     <string name="settings_pin_in_use">Turn off guest mode, Home app and pinning before removing the PIN.</string>
-    <string name="pin_enter_title">Enter exit PIN</string>
+    <string name="pin_enter_title">Enter PIN</string>
     <string name="pin_label">PIN</string>
     <string name="pin_open_settings">Open settings</string>
     <string name="pin_wrong">Wrong PIN.</string>
