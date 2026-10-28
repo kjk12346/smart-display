@@ -79,8 +79,9 @@ Home Assistant.
 ## Family / kitchen display (added 2026-10-09)
 
 - A third display type (Settings > "Who uses this display"). By day a dashboard (`ui/dashboard/`): clock, weather
-  and forecast, the family calendar, who's home with Home and Away buttons, the owner's scene/script buttons, a photo.
-  At night the clock over the photos, dimmed.
+  and forecast, the family calendar, who's home with Home and Away buttons, the owner's scene/script buttons, over the
+  wallpaper photos (dimmed, darker behind the header; cards 85% opaque via `dashCardColor()`; added 2026-10-28,
+  replacing a photo tile). At night the clock over the photos, dimmed.
 - **Family calendar (Skylight-style):** events from every `calendar.*` entity via `calendar.get_events` (from the
   start of today, 7 days, refreshed every 5 min; `CalendarModel.kt`, `CalendarCard.kt`). Google Calendar comes in
   through Home Assistant's own integration (the owner's Google Cloud OAuth client, published so sign-ins don't expire
@@ -95,12 +96,13 @@ Home Assistant.
   back to title + start. That's why events come from the REST API (`GET /api/calendars/<id>`,
   `HomeAssistantClient.calendarEvents`): `calendar.get_events` leaves out the uid. Old assignments aren't pruned.
 - Layout: wide screens give the calendar most of the width (a column per day, as many as fit at 100 dp up to 7; a list
-  if under 3) with Who's home, Buttons and the photo (only if the column is tall enough) beside it. Narrow screens
+  if under 3) with Who's home and Buttons beside it. Narrow screens
   stack calendar first and scroll; cards must not scroll by themselves there (nested vertical scrolling crashes).
 - Checked on the Pixel 6 in portrait and landscape (2026-10-09), and on the owner's TCL tablet (Android 15,
   1200×1920 at 320 dpi, landscape 960×600 dp) on 2026-10-23: a full week fits (84 dp minimum per day), Who's home
-  takes the height it needs (up to 60% of the side column) with Home and Away in equal halves; the photo tile doesn't
-  fit beside them at that height. Not yet with calendars assigned to people.
+  takes the height it needs (up to 60% of the side column) with Home and Away in equal halves. Not yet with calendars
+  assigned to people. On a 15.6" tablet (1280×720 dp, 2026-10-28) the week and side column fit with room to spare; the
+  dashboard clock scales with the screen (56–80 dp) and the clock screen's is capped at 150 dp.
 - TCL's Smart Manager blocks "background auto-launch" for new apps, which would stop alarms, the sunrise and the
   wind-down from starting the app (and rescheduling after a reboot). The owner has to allow it in Smart Manager; the
   app can't. Other makers (Xiaomi, Huawei, Samsung's sleeping apps) do the same: worth a first-run hint later.

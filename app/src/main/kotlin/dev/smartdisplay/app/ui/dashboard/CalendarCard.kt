@@ -97,7 +97,8 @@ internal fun CalendarCard(
         )
     }
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = dashCardColor(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(24.dp),
         modifier = modifier,
     ) {

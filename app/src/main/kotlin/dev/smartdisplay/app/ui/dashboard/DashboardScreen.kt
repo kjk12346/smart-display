@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,12 +33,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
@@ -84,7 +86,8 @@ import java.time.format.TextStyle
 
 /**
  * The kitchen display's daytime screen: the time and weather with a few days' forecast, the family calendar, who's
- * home with Home and Away buttons, the owner's buttons for scenes, scripts and automations, and a photo.
+ * home with Home and Away buttons, and the owner's buttons for scenes, scripts and automations, over the screensaver's
+ * photos (dimmed).
  *
  * Done goes straight to the clock over the photos, as being left alone does after a while.
  *
@@ -256,10 +259,34 @@ fun DashboardScreen(
     val driftX by animateDpAsState(shiftX.dp, tween(DRIFT_MS), label = "driftX")
     val driftY by animateDpAsState(shiftY.dp, tween(DRIFT_MS), label = "driftY")
 
+    // The screensaver's photos behind everything, dimmed so the clock and weather read on them; the cards let them
+    // show through a little.
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        if (photoUrl != null) {
+            WallpaperBackground(photoUrl, wallpaperConfig.intervalMinutes * 60_000L, scrim = false)
+            // Darkest at the top, where the clock, weather and buttons sit straight on the photo.
+            val dim = listOf(Color.Black.copy(alpha = PHOTO_DIM_TOP), Color.Black.copy(alpha = PHOTO_DIM))
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(dim, endY = HEADER_FADE_PX)))
+        }
+        CompositionLocalProvider(LocalOverPhoto provides (photoUrl != null)) {
+            DashboardLayout(header, calendarCard, peopleCard, buttonsCard, showCalendar, driftX, driftY)
+        }
+    }
+}
+
+@Composable
+private fun DashboardLayout(
+    header: @Composable (wide: Boolean, clock: Dp) -> Unit,
+    calendarCard: @Composable (Modifier, Boolean) -> Unit,
+    peopleCard: @Composable (Modifier, Boolean) -> Unit,
+    buttonsCard: @Composable (Modifier, Boolean) -> Unit,
+    showCalendar: Boolean,
+    driftX: Dp,
+    driftY: Dp,
+) {
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()
             .padding(horizontal = 24.dp, vertical = 16.dp)
             .offset(driftX, driftY),
@@ -272,22 +299,18 @@ fun DashboardScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.weight(1f)) {
                     if (showCalendar) {
                         calendarCard(Modifier.weight(2.6f).fillMaxHeight(), true)
-                        // The photo only where the column is tall enough for it to be more than a strip.
                         BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
-                            val photo = maxHeight >= 520.dp
                             val peopleMax = maxHeight * 0.6f
                             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 // Who's home takes what it needs (its Home and Away buttons included), up to most of
                                 // the column; the buttons get the rest.
                                 peopleCard(Modifier.fillMaxWidth().heightIn(max = peopleMax), true)
                                 buttonsCard(Modifier.weight(1f).fillMaxWidth(), true)
-                                if (photo) PhotoTile(photoUrl, wallpaperConfig, Modifier.weight(1.2f).fillMaxWidth())
                             }
                         }
                     } else {
                         peopleCard(Modifier.weight(1f).fillMaxHeight(), true)
                         buttonsCard(Modifier.weight(1.3f).fillMaxHeight(), true)
-                        PhotoTile(photoUrl, wallpaperConfig, Modifier.weight(1.2f).fillMaxHeight())
                     }
                 }
             }
@@ -302,14 +325,25 @@ fun DashboardScreen(
                 if (showCalendar) calendarCard(Modifier.fillMaxWidth(), false)
                 peopleCard(Modifier.fillMaxWidth(), false)
                 buttonsCard(Modifier.fillMaxWidth(), false)
-                PhotoTile(photoUrl, wallpaperConfig, Modifier.fillMaxWidth().aspectRatio(4f / 3f))
             }
         }
     }
 }
 
+/** Whether the dashboard is over a photo, so its cards are a little see-through. */
+private val LocalOverPhoto = staticCompositionLocalOf { false }
+
+/** The cards' color: the usual surface, letting a photo behind show through a little. */
+@Composable
+internal fun dashCardColor(): Color =
+    MaterialTheme.colorScheme.surfaceContainer.let { if (LocalOverPhoto.current) it.copy(alpha = CARD_ALPHA) else it }
+
 private const val FORECAST_DAYS = 5
 private const val DRIFT_MS = 2_000
+private const val PHOTO_DIM = 0.45f
+private const val PHOTO_DIM_TOP = 0.65f
+private const val HEADER_FADE_PX = 500f
+private const val CARD_ALPHA = 0.85f
 
 @Composable
 private fun ForecastStrip(days: List<ForecastDay>, today: LocalDate) {
@@ -351,7 +385,8 @@ private fun DashCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = dashCardColor(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(24.dp),
         modifier = modifier,
     ) {
@@ -509,24 +544,3 @@ private fun RunButton(
     }
 }
 
-@Composable
-private fun PhotoTile(url: String?, config: WallpaperConfig, modifier: Modifier) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        if (url != null) {
-            WallpaperBackground(url, config.intervalMinutes * 60_000L, scrim = false)
-        } else {
-            Text(
-                stringResource(R.string.dashboard_no_photos),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(24.dp),
-            )
-        }
-    }
-}
