@@ -98,8 +98,8 @@ Home Assistant.
 - Layout: wide screens give the calendar most of the width (a column per day, as many as fit at 100 dp up to 7; a list
   if under 3) with Who's home and Buttons beside it. Narrow screens
   stack calendar first and scroll; cards must not scroll by themselves there (nested vertical scrolling crashes).
-- Checked on the Pixel 6 in portrait and landscape (2026-10-09), and on the owner's TCL tablet (Android 15,
-  1200×1920 at 320 dpi, landscape 960×600 dp) on 2026-10-23: a full week fits (84 dp minimum per day), Who's home
+- Checked on the Pixel 6 in portrait and landscape (2026-10-09), and on a TCL tablet (Android 15, 1200×1920 at
+  320 dpi, landscape 960×600 dp; no longer a test device since 2026-10-28) on 2026-10-23: a full week fits (84 dp minimum per day), Who's home
   takes the height it needs (up to 60% of the side column) with Home and Away in equal halves. Not yet with calendars
   assigned to people. On a 15.6" tablet (1280×720 dp, 2026-10-28) the week and side column fit with room to spare; the
   dashboard clock scales with the screen (56–80 dp) and the clock screen's is capped at 150 dp.
