@@ -15,7 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -29,6 +33,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -48,7 +55,7 @@ import dev.smartdisplay.app.ui.signin.displayName
 import kotlinx.coroutines.launch
 
 /** The pages of settings, each opened from the list on the first. */
-private enum class SettingsPage { Mode, Kitchen, Display, Wifi, Alarms, WindDown, Kiosk, Connection }
+internal enum class SettingsPage { Mode, Kitchen, Display, Wifi, Alarms, WindDown, Kiosk, Connection }
 
 /**
  * Settings, behind the exit PIN when one is set: a short list of pages (who uses the display, the family dashboard,
@@ -65,6 +72,16 @@ fun SettingsScreen(
 ) {
     val kiosk by viewModel.config.collectAsStateWithLifecycle()
     var page by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
+    // Kept while a found page is open, so Back returns to the results.
+    var query by rememberSaveable { mutableStateOf("") }
+    // Pages this display doesn't have aren't listed, or found.
+    val pageShown = { shown: SettingsPage ->
+        when (shown) {
+            SettingsPage.Kitchen -> kiosk.isKitchen
+            SettingsPage.WindDown -> !kiosk.isGuest
+            else -> true
+        }
+    }
     BackHandler { if (page != null) page = null else onBack() }
     var problem by remember { mutableStateOf<KioskProblem?>(null) }
     var modeProblem by remember { mutableStateOf<KioskProblem?>(null) }
@@ -75,7 +92,10 @@ fun SettingsScreen(
     when (val shown = page) {
         null -> Panel(eyebrow = stringResource(R.string.settings_eyebrow), title = server.displayName()) {
             PanelBody(connectionText(server, home), topPadding = 4.dp)
-            Column(Modifier.padding(top = 24.dp)) {
+            SearchField(query, onQuery = { query = it })
+            if (query.isNotBlank()) {
+                SearchResults(query, pageShown) { page = it }
+            } else Column(Modifier.padding(top = 8.dp)) {
                 PageRow(
                     stringResource(R.string.settings_mode),
                     stringResource(
@@ -86,7 +106,7 @@ fun SettingsScreen(
                         },
                     ),
                 ) { page = SettingsPage.Mode }
-                if (kiosk.isKitchen) {
+                if (pageShown(SettingsPage.Kitchen)) {
                     PageRow(
                         stringResource(R.string.settings_kitchen_page),
                         stringResource(R.string.settings_kitchen_summary),
@@ -105,7 +125,7 @@ fun SettingsScreen(
                     stringResource(R.string.settings_alarms_summary),
                 ) { page = SettingsPage.Alarms }
                 // Not in guest rooms: a guest's lights are their own business.
-                if (!kiosk.isGuest) {
+                if (pageShown(SettingsPage.WindDown)) {
                     PageRow(
                         stringResource(R.string.wind_down_title),
                         stringResource(R.string.settings_wind_down_summary),
@@ -212,18 +232,68 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun pageTitle(page: SettingsPage): String = stringResource(
-    when (page) {
-        SettingsPage.Mode -> R.string.settings_mode
-        SettingsPage.Kitchen -> R.string.settings_kitchen_page
-        SettingsPage.Display -> R.string.settings_display
-        SettingsPage.Wifi -> R.string.settings_wifi
-        SettingsPage.Alarms -> R.string.settings_alarms
-        SettingsPage.WindDown -> R.string.wind_down_title
-        SettingsPage.Kiosk -> R.string.settings_kiosk
-        SettingsPage.Connection -> R.string.settings_connection
-    },
-)
+private fun pageTitle(page: SettingsPage): String = stringResource(pageTitleRes(page))
+
+private fun pageTitleRes(page: SettingsPage): Int = when (page) {
+    SettingsPage.Mode -> R.string.settings_mode
+    SettingsPage.Kitchen -> R.string.settings_kitchen_page
+    SettingsPage.Display -> R.string.settings_display
+    SettingsPage.Wifi -> R.string.settings_wifi
+    SettingsPage.Alarms -> R.string.settings_alarms
+    SettingsPage.WindDown -> R.string.wind_down_title
+    SettingsPage.Kiosk -> R.string.settings_kiosk
+    SettingsPage.Connection -> R.string.settings_connection
+}
+
+/** The search box over the list of pages, with a way to empty it. */
+@Composable
+private fun SearchField(query: String, onQuery: (String) -> Unit) {
+    val focus = LocalFocusManager.current
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQuery,
+        placeholder = { Text(stringResource(R.string.settings_search)) },
+        singleLine = true,
+        trailingIcon = if (query.isEmpty()) {
+            null
+        } else {
+            {
+                IconButton(onClick = { onQuery("") }) {
+                    Text("\u00d7", style = MaterialTheme.typography.headlineSmall)
+                }
+            }
+        },
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 20.dp),
+    )
+}
+
+/** The settings [query] finds, each with the page it's on; tapping one opens that page. */
+@Composable
+private fun SearchResults(query: String, pageShown: (SettingsPage) -> Boolean, onOpen: (SettingsPage) -> Unit) {
+    val context = LocalContext.current
+    val found = SEARCH_TOPICS.filter { topic ->
+        pageShown(topic.page) && searchMatches(
+            query,
+            listOfNotNull(
+                context.getString(topic.title),
+                context.getString(pageTitleRes(topic.page)),
+                topic.keywords?.let(context::getString),
+            ),
+        )
+    }
+    Column(Modifier.padding(top = 8.dp)) {
+        if (found.isEmpty()) {
+            PanelBody(stringResource(R.string.settings_search_none, query.trim()))
+        }
+        found.forEach { topic ->
+            PageRow(stringResource(topic.title), pageTitle(topic.page)) { onOpen(topic.page) }
+        }
+    }
+}
 
 /** A page of settings in the list: its name, what's in it (or how it's set), and an arrow. */
 @Composable

@@ -166,6 +166,10 @@ Home Assistant.
   started: Home Assistant answers `automation.trigger` only when the actions finish, delays included.
 - **Settings pages (2026-10-28):** Settings is a list of pages (who uses the display, family dashboard, display,
   alarms, winding down, kiosk, Home Assistant with sign-out), each opened on its own; Back returns to the list.
+  A search box over the list (added 2026-10-28) finds settings by their heading, their page's name or other words
+  for them (`SettingsSearch.kt`: `SEARCH_TOPICS`, with keywords in `search_kw_*` strings; case, accents and hyphens
+  ignored, every word must match) and opens the page; pages this display doesn't have aren't found. A new setting
+  needs a `SearchTopic`. Unit-tested only (Settings is behind the PIN on both test devices).
 - **Header in portrait (tablets ≥ 600 dp):** two rows: clock, weather and as many hours as fit (fixed-width
   columns, `fitting()`), then the status chips beside the buttons (one line of buttons when there are no chips, two
   by two when there are). Phones still give the forecast and the chips their own lines.
