@@ -12,6 +12,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -108,12 +109,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         _runs.update { it + (entityId to RunState.Running) }
         viewModelScope.launch {
             val result = try {
-                home.callService(
-                    domain = call.domain,
-                    service = call.service,
-                    data = call.data,
-                    target = buildJsonObject { put("entity_id", entityId) },
-                )
+                // Home Assistant answers an automation's trigger only once its actions finish, waits and delays
+                // included, which can be hours; no answer by then means it's under way.
+                withTimeoutOrNull(RUN_WAIT_MS) {
+                    home.callService(
+                        domain = call.domain,
+                        service = call.service,
+                        data = call.data,
+                        target = buildJsonObject { put("entity_id", entityId) },
+                    )
+                }
                 RunState.Done
             } catch (e: IOException) {
                 // Includes not being connected.
@@ -129,6 +134,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private companion object {
         const val TAG = "DashboardViewModel"
         const val RESULT_SHOWN_MS = 2_500L
+        const val RUN_WAIT_MS = 5_000L
         const val CALENDAR_REFRESH_MS = 5 * 60_000L
         const val RETRY_MS = 60_000L
     }

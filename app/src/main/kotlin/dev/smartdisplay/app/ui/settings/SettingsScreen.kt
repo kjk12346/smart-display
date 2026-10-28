@@ -1,6 +1,11 @@
 package dev.smartdisplay.app.ui.settings
 
 import androidx.activity.compose.BackHandler
+import dev.smartdisplay.app.kiosk.KioskConfig
+import dev.smartdisplay.app.kiosk.DisplayMode
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -42,9 +47,13 @@ import dev.smartdisplay.app.ui.controls.rooms
 import dev.smartdisplay.app.ui.signin.displayName
 import kotlinx.coroutines.launch
 
+/** The pages of settings, each opened from the list on the first. */
+private enum class SettingsPage { Mode, Kitchen, Display, Alarms, WindDown, Kiosk, Connection }
+
 /**
- * Settings, behind the exit PIN when one is set: the connection's details, display and kiosk options, and signing
- * out.
+ * Settings, behind the exit PIN when one is set: a short list of pages (who uses the display, the family dashboard,
+ * the screen, alarms, winding down, kiosk options, and the Home Assistant connection with signing out), each opened
+ * on its own. Back goes from a page to the list, and from the list out of settings.
  */
 @Composable
 fun SettingsScreen(
@@ -54,170 +63,118 @@ fun SettingsScreen(
     onSignOut: () -> Unit,
     viewModel: SettingsViewModel = viewModel(),
 ) {
-    BackHandler(onBack = onBack)
     val kiosk by viewModel.config.collectAsStateWithLifecycle()
+    var page by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
+    BackHandler { if (page != null) page = null else onBack() }
     var problem by remember { mutableStateOf<KioskProblem?>(null) }
     var modeProblem by remember { mutableStateOf<KioskProblem?>(null) }
     var settingPin by remember { mutableStateOf(false) }
     var choosingWallpaper by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    Panel(eyebrow = stringResource(R.string.settings_eyebrow), title = server.displayName()) {
-        PanelBody(server.url, topPadding = 4.dp)
-        PanelBody(connectionText(server, home), topPadding = 16.dp)
-        if (home.loaded) {
-            PanelBody(
-                listOf(
-                    pluralStringResource(R.plurals.count_entities, home.entities.size, home.entities.size),
-                    pluralStringResource(R.plurals.count_areas, home.areas.size, home.areas.size),
-                    pluralStringResource(R.plurals.count_devices, home.devices.size, home.devices.size),
-                ).joinToString(", ")
-            )
-        }
-
-        Section(stringResource(R.string.settings_mode))
-        val rooms = remember(home.entities, home.areas, home.devices, home.registry) { home.rooms() }
-        GuestSettings(
-            kiosk = kiosk,
-            areas = home.areas,
-            rooms = rooms,
-            onMode = { modeProblem = viewModel.setMode(it) },
-            onArea = viewModel::setGuestArea,
-            onAllowed = viewModel::setGuestAllowed,
-            onExtra = viewModel::setGuestExtra,
-        )
-        modeProblem?.let { ProblemText(it) }
-        if (kiosk.isKitchen) KitchenSettings(kiosk.kitchen, home, viewModel::setKitchen)
-
-        Section(stringResource(R.string.settings_display))
-        SwitchRow(
-            title = stringResource(R.string.settings_keep_on),
-            description = stringResource(R.string.settings_keep_on_body),
-            checked = kiosk.keepScreenOn,
-            onCheckedChange = viewModel::setKeepScreenOn,
-        )
-        Text(
-            text = stringResource(R.string.settings_dim_after),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 16.dp),
-        )
-        PanelBody(stringResource(R.string.settings_dim_after_body), topPadding = 2.dp)
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .padding(top = 8.dp)
-                .horizontalScroll(rememberScrollState()),
-        ) {
-            DIM_AFTER_CHOICES.forEach { minutes ->
-                FilterChip(
-                    selected = kiosk.dimAfterMinutes == minutes,
-                    onClick = { viewModel.setDimAfterMinutes(minutes) },
-                    label = {
-                        Text(
-                            if (minutes == 0) {
-                                stringResource(R.string.settings_dim_never)
-                            } else {
-                                stringResource(R.string.settings_dim_minutes, minutes)
-                            }
-                        )
-                    },
-                )
-            }
-        }
-
-        Text(
-            text = stringResource(R.string.wallpaper_title),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 24.dp),
-        )
-        val wallpaper = kiosk.wallpaper
-        PanelBody(
-            if (wallpaper.folderId == null) {
-                stringResource(R.string.wallpaper_none)
-            } else {
-                stringResource(R.string.wallpaper_folder, wallpaper.folderTitle.orEmpty())
-            },
-            topPadding = 2.dp,
-        )
-        Row(modifier = Modifier.padding(top = 8.dp)) {
-            OutlinedButton(onClick = { choosingWallpaper = true }) {
-                Text(stringResource(R.string.wallpaper_choose))
-            }
-            if (wallpaper.folderId != null) {
-                TextButton(
-                    onClick = { viewModel.setWallpaperFolder(null) },
-                    modifier = Modifier.padding(start = 8.dp),
-                ) {
-                    Text(stringResource(R.string.wallpaper_remove))
+    when (val shown = page) {
+        null -> Panel(eyebrow = stringResource(R.string.settings_eyebrow), title = server.displayName()) {
+            PanelBody(connectionText(server, home), topPadding = 4.dp)
+            Column(Modifier.padding(top = 24.dp)) {
+                PageRow(
+                    stringResource(R.string.settings_mode),
+                    stringResource(
+                        when (kiosk.mode) {
+                            DisplayMode.Owner -> R.string.mode_owner
+                            DisplayMode.Guest -> R.string.mode_guest
+                            DisplayMode.Kitchen -> R.string.mode_kitchen
+                        },
+                    ),
+                ) { page = SettingsPage.Mode }
+                if (kiosk.isKitchen) {
+                    PageRow(
+                        stringResource(R.string.settings_kitchen_page),
+                        stringResource(R.string.settings_kitchen_summary),
+                    ) { page = SettingsPage.Kitchen }
                 }
-            }
-        }
-        if (wallpaper.folderId != null) {
-            PanelBody(stringResource(R.string.wallpaper_interval), topPadding = 12.dp)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .horizontalScroll(rememberScrollState()),
-            ) {
-                WALLPAPER_INTERVAL_CHOICES.forEach { minutes ->
-                    FilterChip(
-                        selected = wallpaper.intervalMinutes == minutes,
-                        onClick = { viewModel.setWallpaperInterval(minutes) },
-                        label = { Text(stringResource(R.string.settings_dim_minutes, minutes)) },
-                    )
+                PageRow(
+                    stringResource(R.string.settings_display),
+                    stringResource(R.string.settings_display_summary),
+                ) { page = SettingsPage.Display }
+                PageRow(
+                    stringResource(R.string.settings_alarms),
+                    stringResource(R.string.settings_alarms_summary),
+                ) { page = SettingsPage.Alarms }
+                // Not in guest rooms: a guest's lights are their own business.
+                if (!kiosk.isGuest) {
+                    PageRow(
+                        stringResource(R.string.wind_down_title),
+                        stringResource(R.string.settings_wind_down_summary),
+                    ) { page = SettingsPage.WindDown }
                 }
+                PageRow(
+                    stringResource(R.string.settings_kiosk),
+                    stringResource(
+                        if (kiosk.hasPin) R.string.settings_kiosk_summary_pin else R.string.settings_kiosk_summary,
+                    ),
+                ) { page = SettingsPage.Kiosk }
+                PageRow(
+                    stringResource(R.string.settings_connection),
+                    server.url,
+                ) { page = SettingsPage.Connection }
             }
-        }
-
-        Section(stringResource(R.string.settings_alarms))
-        AlarmSettings(home = home, browse = viewModel::browseMedia)
-
-        // Not in guest rooms: a guest's lights are their own business.
-        if (!kiosk.isGuest) {
-            Section(stringResource(R.string.wind_down_title))
-            WindDownSettings(home)
-        }
-
-        Section(stringResource(R.string.settings_kiosk))
-        Text(stringResource(R.string.settings_exit_pin), style = MaterialTheme.typography.titleMedium)
-        PanelBody(
-            stringResource(if (kiosk.hasPin) R.string.settings_pin_set else R.string.settings_pin_unset),
-            topPadding = 2.dp,
-        )
-        Row(modifier = Modifier.padding(top = 8.dp)) {
-            OutlinedButton(onClick = { settingPin = true }) {
-                Text(stringResource(if (kiosk.hasPin) R.string.settings_pin_change else R.string.settings_pin_create))
-            }
-            if (kiosk.hasPin) {
-                TextButton(
-                    onClick = { problem = viewModel.removePin() },
-                    modifier = Modifier.padding(start = 8.dp),
-                ) {
-                    Text(stringResource(R.string.settings_pin_remove))
-                }
-            }
-        }
-        SwitchRow(
-            title = stringResource(R.string.settings_home_app),
-            description = stringResource(R.string.settings_home_app_body),
-            checked = kiosk.homeApp,
-            onCheckedChange = { problem = viewModel.setHomeApp(it) },
-        )
-        SwitchRow(
-            title = stringResource(R.string.settings_pin_app),
-            description = stringResource(R.string.settings_pin_app_body),
-            checked = kiosk.pinApp,
-            onCheckedChange = { problem = viewModel.setPinApp(it) },
-        )
-        problem?.let { ProblemText(it) }
-
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 32.dp)) {
-            Button(onClick = onBack) {
+            Button(onClick = onBack, modifier = Modifier.padding(top = 32.dp)) {
                 Text(stringResource(R.string.settings_done))
             }
-            OutlinedButton(onClick = onSignOut, modifier = Modifier.padding(start = 12.dp)) {
-                Text(stringResource(R.string.sign_out))
+        }
+        else -> Panel(eyebrow = stringResource(R.string.settings_eyebrow), title = pageTitle(shown)) {
+            when (shown) {
+                SettingsPage.Mode -> {
+                    val rooms = remember(home.entities, home.areas, home.devices, home.registry) { home.rooms() }
+                    GuestSettings(
+                        kiosk = kiosk,
+                        areas = home.areas,
+                        rooms = rooms,
+                        onMode = { modeProblem = viewModel.setMode(it) },
+                        onArea = viewModel::setGuestArea,
+                        onAllowed = viewModel::setGuestAllowed,
+                        onExtra = viewModel::setGuestExtra,
+                    )
+                    modeProblem?.let { ProblemText(it) }
+                }
+                SettingsPage.Kitchen -> KitchenSettings(kiosk.kitchen, home, viewModel::setKitchen)
+                SettingsPage.Display -> DisplaySettings(kiosk, viewModel) { choosingWallpaper = true }
+                SettingsPage.Alarms -> AlarmSettings(home = home, browse = viewModel::browseMedia)
+                SettingsPage.WindDown -> WindDownSettings(home)
+                SettingsPage.Kiosk -> {
+                    KioskSettings(
+                        hasPin = kiosk.hasPin,
+                        homeApp = kiosk.homeApp,
+                        pinApp = kiosk.pinApp,
+                        onSetPin = { settingPin = true },
+                        onRemovePin = { problem = viewModel.removePin() },
+                        onHomeApp = { problem = viewModel.setHomeApp(it) },
+                        onPinApp = { problem = viewModel.setPinApp(it) },
+                    )
+                    problem?.let { ProblemText(it) }
+                }
+                SettingsPage.Connection -> {
+                    PanelBody(server.url, topPadding = 4.dp)
+                    PanelBody(connectionText(server, home), topPadding = 16.dp)
+                    if (home.loaded) {
+                        PanelBody(
+                            listOf(
+                                pluralStringResource(R.plurals.count_entities, home.entities.size, home.entities.size),
+                                pluralStringResource(R.plurals.count_areas, home.areas.size, home.areas.size),
+                                pluralStringResource(R.plurals.count_devices, home.devices.size, home.devices.size),
+                            ).joinToString(", "),
+                        )
+                    }
+                    OutlinedButton(onClick = onSignOut, modifier = Modifier.padding(top = 24.dp)) {
+                        Text(stringResource(R.string.sign_out))
+                    }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 32.dp)) {
+                Button(onClick = { page = null }) { Text(stringResource(R.string.settings_back)) }
+                TextButton(onClick = onBack, modifier = Modifier.padding(start = 12.dp)) {
+                    Text(stringResource(R.string.settings_done))
+                }
             }
         }
     }
@@ -247,6 +204,173 @@ fun SettingsScreen(
             onDismiss = { settingPin = false },
         )
     }
+}
+
+@Composable
+private fun pageTitle(page: SettingsPage): String = stringResource(
+    when (page) {
+        SettingsPage.Mode -> R.string.settings_mode
+        SettingsPage.Kitchen -> R.string.settings_kitchen_page
+        SettingsPage.Display -> R.string.settings_display
+        SettingsPage.Alarms -> R.string.settings_alarms
+        SettingsPage.WindDown -> R.string.wind_down_title
+        SettingsPage.Kiosk -> R.string.settings_kiosk
+        SettingsPage.Connection -> R.string.settings_connection
+    },
+)
+
+/** A page of settings in the list: its name, what's in it (or how it's set), and an arrow. */
+@Composable
+private fun PageRow(title: String, summary: String, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                summary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            "\u203a",
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp),
+        )
+    }
+    HorizontalDivider()
+}
+
+/** The screen: keeping it on, dimming when idle, and the wallpaper photos. */
+@Composable
+private fun DisplaySettings(kiosk: KioskConfig, viewModel: SettingsViewModel, onChooseWallpaper: () -> Unit) {
+    SwitchRow(
+        title = stringResource(R.string.settings_keep_on),
+        description = stringResource(R.string.settings_keep_on_body),
+        checked = kiosk.keepScreenOn,
+        onCheckedChange = viewModel::setKeepScreenOn,
+    )
+    Text(
+        text = stringResource(R.string.settings_dim_after),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 16.dp),
+    )
+    PanelBody(stringResource(R.string.settings_dim_after_body), topPadding = 2.dp)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .horizontalScroll(rememberScrollState()),
+    ) {
+        DIM_AFTER_CHOICES.forEach { minutes ->
+            FilterChip(
+                selected = kiosk.dimAfterMinutes == minutes,
+                onClick = { viewModel.setDimAfterMinutes(minutes) },
+                label = {
+                    Text(
+                        if (minutes == 0) {
+                            stringResource(R.string.settings_dim_never)
+                        } else {
+                            stringResource(R.string.settings_dim_minutes, minutes)
+                        }
+                    )
+                },
+            )
+        }
+    }
+
+    Text(
+        text = stringResource(R.string.wallpaper_title),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 24.dp),
+    )
+    val wallpaper = kiosk.wallpaper
+    PanelBody(
+        if (wallpaper.folderId == null) {
+            stringResource(R.string.wallpaper_none)
+        } else {
+            stringResource(R.string.wallpaper_folder, wallpaper.folderTitle.orEmpty())
+        },
+        topPadding = 2.dp,
+    )
+    Row(modifier = Modifier.padding(top = 8.dp)) {
+        OutlinedButton(onClick = onChooseWallpaper) {
+            Text(stringResource(R.string.wallpaper_choose))
+        }
+        if (wallpaper.folderId != null) {
+            TextButton(
+                onClick = { viewModel.setWallpaperFolder(null) },
+                modifier = Modifier.padding(start = 8.dp),
+            ) {
+                Text(stringResource(R.string.wallpaper_remove))
+            }
+        }
+    }
+    if (wallpaper.folderId != null) {
+        PanelBody(stringResource(R.string.wallpaper_interval), topPadding = 12.dp)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .horizontalScroll(rememberScrollState()),
+        ) {
+            WALLPAPER_INTERVAL_CHOICES.forEach { minutes ->
+                FilterChip(
+                    selected = wallpaper.intervalMinutes == minutes,
+                    onClick = { viewModel.setWallpaperInterval(minutes) },
+                    label = { Text(stringResource(R.string.settings_dim_minutes, minutes)) },
+                )
+            }
+        }
+    }
+}
+
+/** The way out (the exit PIN), and keeping people in: Home app and pinning, which both need the PIN. */
+@Composable
+private fun KioskSettings(
+    hasPin: Boolean,
+    homeApp: Boolean,
+    pinApp: Boolean,
+    onSetPin: () -> Unit,
+    onRemovePin: () -> Unit,
+    onHomeApp: (Boolean) -> Unit,
+    onPinApp: (Boolean) -> Unit,
+) {
+    Text(stringResource(R.string.settings_exit_pin), style = MaterialTheme.typography.titleMedium)
+    PanelBody(
+        stringResource(if (hasPin) R.string.settings_pin_set else R.string.settings_pin_unset),
+        topPadding = 2.dp,
+    )
+    Row(modifier = Modifier.padding(top = 8.dp)) {
+        OutlinedButton(onClick = onSetPin) {
+            Text(stringResource(if (hasPin) R.string.settings_pin_change else R.string.settings_pin_create))
+        }
+        if (hasPin) {
+            TextButton(onClick = onRemovePin, modifier = Modifier.padding(start = 8.dp)) {
+                Text(stringResource(R.string.settings_pin_remove))
+            }
+        }
+    }
+    SwitchRow(
+        title = stringResource(R.string.settings_home_app),
+        description = stringResource(R.string.settings_home_app_body),
+        checked = homeApp,
+        onCheckedChange = onHomeApp,
+    )
+    SwitchRow(
+        title = stringResource(R.string.settings_pin_app),
+        description = stringResource(R.string.settings_pin_app_body),
+        checked = pinApp,
+        onCheckedChange = onPinApp,
+    )
 }
 
 @Composable
@@ -280,17 +404,6 @@ private fun connectionText(server: SavedServer, home: HomeState): String = when 
         }
     )
     else -> stringResource(R.string.live_connecting)
-}
-
-@Composable
-private fun Section(title: String) {
-    HorizontalDivider(modifier = Modifier.padding(top = 32.dp, bottom = 16.dp))
-    Text(
-        text = title.uppercase(),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.secondary,
-        modifier = Modifier.padding(bottom = 8.dp),
-    )
 }
 
 @Composable

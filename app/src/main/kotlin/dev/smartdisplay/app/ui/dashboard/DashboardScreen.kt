@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.border
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -226,6 +227,26 @@ fun DashboardScreen(
         }
     }
     var choosingWeather by remember { mutableStateOf(false) }
+    // A button long-pressed: its editor opens once arranging starts (after the PIN), and arranging ends with it if
+    // that's all it was started for.
+    var shortcutAsked by remember { mutableStateOf<String?>(null) }
+    var shortcutEditing by remember { mutableStateOf<String?>(null) }
+    var arrangingForShortcut by remember { mutableStateOf(false) }
+    LaunchedEffect(editing) {
+        if (editing && shortcutAsked != null) {
+            shortcutEditing = shortcutAsked
+            shortcutAsked = null
+        }
+    }
+    val onEditShortcut = { id: String ->
+        if (editing) {
+            shortcutEditing = id
+        } else {
+            shortcutAsked = id
+            arrangingForShortcut = true
+            onEditRequest()
+        }
+    }
     var choosingStatus by remember { mutableStateOf(false) }
     var resetting by remember { mutableStateOf<Grid?>(null) }
     var adding by remember { mutableStateOf(false) }
@@ -369,6 +390,7 @@ fun DashboardScreen(
             shortcuts = shown,
             labels = shortLabels(shown.associateWith { names[it]?.friendlyName ?: it }, kitchen.shortcutNames),
             icons = kitchen.shortcutIcons,
+            onEdit = onEditShortcut,
             runs = runs,
             onRun = viewModel::run,
             modifier = modifier,
@@ -403,7 +425,18 @@ fun DashboardScreen(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .pointerInput(editing) { if (!editing) detectTapGestures(onLongPress = { onEditRequest() }) },
+            .pointerInput(editing) {
+                if (!editing) {
+                    detectTapGestures(
+                        onLongPress = {
+                            // Arranging for its own sake: forget a button long-pressed before (its PIN cancelled).
+                            shortcutAsked = null
+                            arrangingForShortcut = false
+                            onEditRequest()
+                        },
+                    )
+                }
+            },
     ) {
         if (photoUrl != null) {
             WallpaperBackground(photoUrl, wallpaperConfig.intervalMinutes * 60_000L, scrim = false)
@@ -421,6 +454,13 @@ fun DashboardScreen(
     if (choosingWeather) {
         WeatherSourceDialog(kitchen, home, onKitchenChange, onDismiss = { choosingWeather = false })
     }
+    shortcutEditing?.let { id ->
+        ShortcutEditor(id, kitchen, home, onKitchenChange) {
+            shortcutEditing = null
+            if (arrangingForShortcut) onEditDone()
+            arrangingForShortcut = false
+        }
+    }
     if (choosingStatus) {
         StatusSourcesDialog(kitchen, home, onKitchenChange, onDismiss = { choosingStatus = false })
     }
@@ -429,8 +469,11 @@ fun DashboardScreen(
             onDismissRequest = { resetting = null },
             title = { Text(stringResource(R.string.dashboard_reset_title)) },
             text = {
-                val wide = grid == WIDE_GRID
-                Text(stringResource(if (wide) R.string.dashboard_reset_wide_body else R.string.dashboard_reset_tall_body))
+                val body = when (grid) {
+                    WIDE_GRID -> R.string.dashboard_reset_wide_body
+                    else -> R.string.dashboard_reset_tall_body
+                }
+                Text(stringResource(body))
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -760,6 +803,7 @@ private fun ButtonsCard(
     shortcuts: List<String>,
     labels: Map<String, String>,
     icons: Map<String, String>,
+    onEdit: (String) -> Unit,
     runs: Map<String, RunState>,
     onRun: (String) -> Unit,
     modifier: Modifier,
@@ -786,6 +830,7 @@ private fun ButtonsCard(
                                 icon = icons[id],
                                 state = runs[id],
                                 modifier = Modifier.width(width),
+                                onLongClick = { onEdit(id) },
                             ) { onRun(id) }
                         }
                     }
@@ -798,11 +843,20 @@ private fun ButtonsCard(
 private val TILE_MIN_WIDTH = 68.dp
 private val TILE_GAP = 10.dp
 
-/** A button as a tile: its icon in a circle (which shows for a moment whether it worked), its short name under it. */
+/**
+ * A button as a tile: its icon in a circle (which shows for a moment whether it worked), its short name under it. A
+ * long press is for changing them.
+ */
 @Composable
-private fun ShortcutTile(label: String, icon: String?, state: RunState?, modifier: Modifier, onClick: () -> Unit) {
+private fun ShortcutTile(
+    label: String,
+    icon: String?,
+    state: RunState?,
+    modifier: Modifier,
+    onLongClick: () -> Unit,
+    onClick: () -> Unit,
+) {
     Surface(
-        onClick = onClick,
         shape = RoundedCornerShape(20.dp),
         color = if (state == RunState.Failed) {
             MaterialTheme.colorScheme.errorContainer
@@ -813,7 +867,9 @@ private fun ShortcutTile(label: String, icon: String?, state: RunState?, modifie
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+            modifier = Modifier
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .padding(horizontal = 6.dp, vertical = 10.dp),
         ) {
             when (state) {
                 RunState.Running -> ShortcutIcon("\u2026", label)

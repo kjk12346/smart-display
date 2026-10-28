@@ -134,7 +134,11 @@ Home Assistant.
 - **Who's home and Buttons (2026-10-28):** Who's home shows only initials circles (filled in the person's color when
   home, a ring when not). Buttons are tiles: an icon circle (an emoji the owner picks, else the first letter) and a
   short name (`shortLabels`: the owner's, else the name without the words all the buttons share). Set per button in
-  the card's Sources (`Shortcuts.kt`; `KitchenConfig.shortcutNames` / `shortcutIcons`).
+  the card's Sources (`Shortcuts.kt`; `KitchenConfig.shortcutNames` / `shortcutIcons`), or by long-pressing a tile
+  (behind the PIN; it enters arranging and leaves it when the editor closes). A run with no answer in 5 s counts as
+  started: Home Assistant answers `automation.trigger` only when the actions finish, delays included.
+- **Settings pages (2026-10-28):** Settings is a list of pages (who uses the display, family dashboard, display,
+  alarms, winding down, kiosk, Home Assistant with sign-out), each opened on its own; Back returns to the list.
 - **Header in portrait (tablets ≥ 600 dp):** two rows: clock, weather and as many hours as fit (fixed-width
   columns, `fitting()`), then the status chips beside the buttons (one line of buttons when there are no chips, two
   by two when there are). Phones still give the forecast and the chips their own lines.

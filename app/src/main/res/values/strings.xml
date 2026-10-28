@@ -184,6 +184,15 @@
     <string name="guest_add_title">Add devices from other rooms</string>
     <string name="guest_remove">Remove</string>
     <string name="settings_display">Display</string>
+    <string name="settings_display_summary">Keeping the screen on, dimming, wallpaper photos</string>
+    <string name="settings_kitchen_page">Family dashboard</string>
+    <string name="settings_kitchen_summary">Calendars, people, Home and Away, screensaver</string>
+    <string name="settings_alarms_summary">Sound, lights, speaker, sunrise</string>
+    <string name="settings_wind_down_summary">Dimming the lights before bed</string>
+    <string name="settings_kiosk_summary">No exit PIN yet; Home app and pinning</string>
+    <string name="settings_kiosk_summary_pin">Exit PIN, Home app and pinning</string>
+    <string name="settings_connection">Home Assistant</string>
+    <string name="settings_back">Back</string>
     <string name="settings_keep_on">Keep screen on</string>
     <string name="settings_keep_on_body">The screen stays on while this app is showing.</string>
     <string name="settings_dim_after">Dim when idle</string>

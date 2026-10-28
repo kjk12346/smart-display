@@ -134,27 +134,39 @@ internal fun ButtonsSources(
             onDismiss = { choosing = false },
         )
     }
-    editing?.let { id ->
-        // The name it would have without one of its own, for the field's hint.
-        val automatic = shortLabels(shown.associateWith(::nameOf)).getValue(id)
-        ShortcutDialog(
-            fullName = nameOf(id),
-            automatic = automatic,
-            name = kitchen.shortcutNames[id].orEmpty(),
-            icon = kitchen.shortcutIcons[id],
-            onSave = { name, icon ->
-                onKitchenChange(
-                    kitchen.copy(
-                        shortcutNames = (kitchen.shortcutNames - id) +
-                            listOfNotNull(name.trim().ifEmpty { null }?.let { id to it }),
-                        shortcutIcons = (kitchen.shortcutIcons - id) + listOfNotNull(icon?.let { id to it }),
-                    ),
-                )
-                editing = null
-            },
-            onDismiss = { editing = null },
-        )
-    }
+    editing?.let { id -> ShortcutEditor(id, kitchen, home, onKitchenChange, onDismiss = { editing = null }) }
+}
+
+/** One button's short name and icon, saved in [kitchen]. */
+@Composable
+internal fun ShortcutEditor(
+    id: String,
+    kitchen: KitchenConfig,
+    home: HomeState,
+    onKitchenChange: (KitchenConfig) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    fun nameOf(entityId: String) = home.entities[entityId]?.friendlyName ?: entityId
+    // The name it would have without one of its own, for the field's hint.
+    val shown = kitchen.shortcuts.filter { it in home.entities }
+    val automatic = shortLabels(shown.associateWith(::nameOf))[id] ?: nameOf(id)
+    ShortcutDialog(
+        fullName = nameOf(id),
+        automatic = automatic,
+        name = kitchen.shortcutNames[id].orEmpty(),
+        icon = kitchen.shortcutIcons[id],
+        onSave = { name, icon ->
+            onKitchenChange(
+                kitchen.copy(
+                    shortcutNames = (kitchen.shortcutNames - id) +
+                        listOfNotNull(name.trim().ifEmpty { null }?.let { id to it }),
+                    shortcutIcons = (kitchen.shortcutIcons - id) + listOfNotNull(icon?.let { id to it }),
+                ),
+            )
+            onDismiss()
+        },
+        onDismiss = onDismiss,
+    )
 }
 
 /** One button's short name (blank for the automatic one) and icon (none for its first letter). */
