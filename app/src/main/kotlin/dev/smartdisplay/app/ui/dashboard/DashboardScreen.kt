@@ -195,7 +195,7 @@ fun DashboardScreen(
         )
     }
     // A choice of someone who no longer has a calendar shown is dropped.
-    val selected = selectedOwners.filterTo(mutableSetOf()) { id -> owners.any { it.id == id } }
+    val selected = selectedOwners.filterTo(mutableSetOf()) { id -> id != FAMILY && owners.any { it.id == id } }
 
     val currentWeather: @Composable () -> Unit = {
         val weather = weatherEntity?.toCurrentWeather()
@@ -382,7 +382,8 @@ fun DashboardScreen(
                 owners = owners,
                 people = household,
                 selected = selected,
-                onToggle = { viewModel.toggleOwner(it, owners.map { owner -> owner.id }) },
+                // Everyone picked one by one is the same as "Everyone" (the family has no chip of its own).
+                onToggle = { viewModel.toggleOwner(it, owners.map { owner -> owner.id } - FAMILY) },
                 onEveryone = viewModel::showEveryone,
                 calendarName = { names[it]?.friendlyName ?: it },
                 onAssign = viewModel::assign,

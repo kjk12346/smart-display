@@ -123,8 +123,10 @@ internal fun CalendarCard(
                     color = MaterialTheme.colorScheme.secondary,
                 )
                 Box(Modifier.weight(1f)) {
-                    if (owners.size > 1) {
-                        Box(Modifier.padding(start = 16.dp)) { OwnerChips(owners, selected, onToggle, onEveryone) }
+                    // The family's events are everyone's, so "Everyone" stands for them: no chip of their own.
+                    val people = owners.filter { it.id != FAMILY }
+                    if (owners.size > 1 && people.isNotEmpty()) {
+                        Box(Modifier.padding(start = 16.dp)) { OwnerChips(people, selected, onToggle, onEveryone) }
                     }
                 }
                 if (bounded) {
