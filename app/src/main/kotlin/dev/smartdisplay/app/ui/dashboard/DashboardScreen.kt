@@ -756,7 +756,9 @@ private fun PeopleCard(
                 val gap = 10.dp
                 val perRow = ((maxWidth + gap) / (PERSON_MIN + gap)).toInt()
                     .coerceIn(1, people.size.coerceAtLeast(1))
-                val column = ((maxWidth - gap * (perRow - 1)) / perRow).coerceAtMost(PERSON_WIDTH)
+                // A whole dp less, so rounding to pixels never makes the row a hair too wide and wrap.
+                val share = (maxWidth - gap * (perRow - 1)) / perRow
+                val column = (share.value.toInt() - 1).dp.coerceAtMost(PERSON_WIDTH)
                 val circle = (column - 12.dp).coerceIn(44.dp, 56.dp)
                 val initialsStyle = MaterialTheme.typography.run { if (circle < 52.dp) titleMedium else titleLarge }
                 FlowRow(
