@@ -131,8 +131,9 @@ Home Assistant.
   bars), then the days. No title; it fits its size (`WeatherCard`): stacked, with the graph taking the height left
   and the days only if there's room, or now and the graph side by side in a short, wide card. Checked on the 15.6"
   tablet (Met.no): header in both orientations, the card stacked (landscape, before the fit) and side by side.
-- **Who's home and Buttons (2026-10-28):** Who's home shows only initials circles (filled in the person's color when
-  home, a ring when not). Buttons are tiles: an icon circle (an emoji the owner picks, else the first letter) and a
+- **Who's home and Buttons (2026-10-28):** Who's home shows initials circles with where each person is under them:
+  filled in their color at home, a solid ring of it when away (labelled with the zone, e.g. Work, or "Away"), a faint
+  dashed ring when nothing tracks them ("Not known"). Buttons are tiles: an icon circle (an emoji the owner picks, else the first letter) and a
   short name (`shortLabels`: the owner's, else the name without the words all the buttons share). Set per button in
   the card's Sources (`Shortcuts.kt`; `KitchenConfig.shortcutNames` / `shortcutIcons`), or by long-pressing a tile
   (behind the PIN; it enters arranging and leaves it when the editor closes). A run with no answer in 5 s counts as

@@ -8,6 +8,9 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -742,37 +745,66 @@ private fun PeopleCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        // Just their initials: in their color when home, a ring of it when not.
+        // Their initials, and where they are: filled in their color at home, a ring of it when out (with the zone,
+        // such as Work, under it), a faint dashed ring when nothing says where they are.
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             people.forEach { person ->
-                val home = person.presence == Presence.Home
                 val color = colorOf(person.entityId) ?: MaterialTheme.colorScheme.primary
+                val muted = MaterialTheme.colorScheme.onSurfaceVariant
                 val where = when (person.presence) {
                     Presence.Home -> stringResource(R.string.presence_home)
                     Presence.Away -> person.place ?: stringResource(R.string.presence_away)
                     Presence.Unknown -> stringResource(R.string.presence_unknown)
                 }
-                Box(
-                    contentAlignment = Alignment.Center,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .then(
-                            if (home) {
-                                Modifier.background(color)
-                            } else {
-                                Modifier.border(2.5.dp, color.copy(alpha = 0.6f), CircleShape)
-                            },
-                        )
+                        .width(PERSON_WIDTH)
                         .semantics(mergeDescendants = true) { contentDescription = "${person.name}, $where" },
                 ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .then(
+                                when (person.presence) {
+                                    Presence.Home -> Modifier.background(color)
+                                    Presence.Away -> Modifier.border(3.dp, color, CircleShape)
+                                    Presence.Unknown -> Modifier.drawBehind {
+                                        val stroke = 2.dp.toPx()
+                                        drawCircle(
+                                            muted.copy(alpha = 0.6f),
+                                            radius = size.minDimension / 2 - stroke / 2,
+                                            style = Stroke(
+                                                stroke,
+                                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())),
+                                            ),
+                                        )
+                                    }
+                                },
+                            ),
+                    ) {
+                        Text(
+                            person.initials,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = when (person.presence) {
+                                Presence.Home -> OnPersonColor
+                                Presence.Away -> color
+                                Presence.Unknown -> muted
+                            },
+                        )
+                    }
                     Text(
-                        person.initials,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = if (home) OnPersonColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        where,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (person.presence == Presence.Home) MaterialTheme.colorScheme.onSurface else muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                 }
             }
@@ -841,6 +873,9 @@ private fun ButtonsCard(
 }
 
 private val TILE_MIN_WIDTH = 68.dp
+
+/** Each person's column in Who's home: their circle, and where they are under it. */
+private val PERSON_WIDTH = 72.dp
 private val TILE_GAP = 10.dp
 
 /**
