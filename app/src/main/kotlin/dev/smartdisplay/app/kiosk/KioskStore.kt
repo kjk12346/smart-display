@@ -84,6 +84,7 @@ class KioskStore(context: Context) {
         putString(KEY_KITCHEN_STATUS, encodeIds(kitchen.statusEntities))
         putString(KEY_KITCHEN_SHORTCUT_NAMES, encodeMap(kitchen.shortcutNames))
         putString(KEY_KITCHEN_SHORTCUT_ICONS, encodeMap(kitchen.shortcutIcons))
+        putString(KEY_KITCHEN_CALENDAR_VIEW, kitchen.calendarView.name)
     }
 
     fun setWifi(wifi: WifiConfig) = update {
@@ -164,6 +165,8 @@ class KioskStore(context: Context) {
             statusEntities = decodeIds(prefs.getString(KEY_KITCHEN_STATUS, null)),
             shortcutNames = decodeMap(prefs.getString(KEY_KITCHEN_SHORTCUT_NAMES, null)),
             shortcutIcons = decodeMap(prefs.getString(KEY_KITCHEN_SHORTCUT_ICONS, null)),
+            calendarView = prefs.getString(KEY_KITCHEN_CALENDAR_VIEW, null)
+                .let { view -> CalendarView.entries.firstOrNull { it.name == view } } ?: CalendarView.Week,
         ),
         wifi = WifiConfig(
             ssid = prefs.getString(KEY_WIFI_SSID, null),
@@ -208,6 +211,7 @@ class KioskStore(context: Context) {
         const val KEY_WIFI_HIDDEN = "wifi_hidden"
         const val KEY_KITCHEN_SHORTCUT_NAMES = "kitchen_shortcut_names"
         const val KEY_KITCHEN_SHORTCUT_ICONS = "kitchen_shortcut_icons"
+        const val KEY_KITCHEN_CALENDAR_VIEW = "kitchen_calendar_view"
     }
 }
 

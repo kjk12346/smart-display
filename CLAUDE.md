@@ -120,6 +120,12 @@ Home Assistant.
   event's `uid` (every time) or `uid#recurrence_id` (just this time of a repeating one); events without a uid fall
   back to title + start. That's why events come from the REST API (`GET /api/calendars/<id>`,
   `HomeAssistantClient.calendarEvents`): `calendar.get_events` leaves out the uid. Old assignments aren't pruned.
+- **Agenda view (added 2026-10-28):** a Week / Agenda switch in the calendar card's corner
+  (`KitchenConfig.calendarView`, saved; no PIN, like the person chips). The agenda ("Coming up") lists the next
+  14 days with something on (`AGENDA_DAYS`; events are now fetched for 14 days, the week still shows 7), each day's
+  weekday, date (today circled) and month beside its events, in columns of at least 340 dp, up to 3, of about equal
+  length (`agendaColumns`, read down then across); a narrow card gets the plain list. Phones (stacked) always
+  get the list. Checked on the 15.6" tablet in landscape (two columns).
 - Layout: wide screens give the calendar most of the width (a column per day, as many as fit at 100 dp up to 7; a list
   if under 3) with Who's home and Buttons beside it. Narrow screens
   stack calendar first and scroll; cards must not scroll by themselves there (nested vertical scrolling crashes).

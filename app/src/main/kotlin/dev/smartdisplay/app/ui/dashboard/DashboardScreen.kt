@@ -386,6 +386,8 @@ fun DashboardScreen(
                 onEveryone = viewModel::showEveryone,
                 calendarName = { names[it]?.friendlyName ?: it },
                 onAssign = viewModel::assign,
+                view = kitchen.calendarView,
+                onView = { onKitchenChange(kitchen.copy(calendarView = it)) },
                 now = now,
                 bounded = bounded,
                 modifier = modifier,

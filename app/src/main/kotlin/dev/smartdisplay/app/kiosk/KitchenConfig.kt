@@ -38,7 +38,12 @@ data class KitchenConfig(
     val shortcutNames: Map<String, String> = emptyMap(),
     /** An emoji for each button that has one, by entity ID; the rest show their first letter. */
     val shortcutIcons: Map<String, String> = emptyMap(),
+    /** How the calendar shows the days ahead: a column per day, or a list of what's coming. */
+    val calendarView: CalendarView = CalendarView.Week,
 )
+
+/** The calendar card's two ways of showing events. */
+enum class CalendarView { Week, Agenda }
 
 const val DEFAULT_SCREENSAVER_MINUTES = 10
 

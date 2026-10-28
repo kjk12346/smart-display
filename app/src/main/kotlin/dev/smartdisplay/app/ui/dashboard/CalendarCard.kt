@@ -25,6 +25,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.smartdisplay.app.R
 import dev.smartdisplay.app.alarm.timeText
+import dev.smartdisplay.app.kiosk.CalendarView
 import dev.smartdisplay.app.ui.theme.OnPersonColor
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -59,9 +63,15 @@ private val MIN_DAY_WIDTH = 84.dp
 /** Fewer days than this fit, and the calendar is a list instead. */
 private const val MIN_GRID_DAYS = 3
 
+/** The agenda's days run in columns of at least this width, up to [MAX_AGENDA_COLUMNS], on a wide card. */
+private val AGENDA_COLUMN_WIDTH = 340.dp
+private const val MAX_AGENDA_COLUMNS = 3
+
 /**
- * The family calendar: a chip per person (and the family) to show only theirs, then the days ahead as a column per
- * day, as many as fit up to a week, or as a list by day where even a few don't. Each event is in its owner's color.
+ * The family calendar: a chip per person (and the family) to show only theirs, then the days ahead, in its [view]:
+ * a column per day, as many as fit up to a week (a list by day where even a few don't), or an agenda of the next
+ * two weeks, in columns of days on a wide card. Each event is in its owner's color. A switch in the corner changes
+ * the view ([onView]); stacked on a phone, it's always the list.
  *
  * Tapping an event opens its details, where it can be given to [people] ([onAssign]).
  *
@@ -78,10 +88,13 @@ internal fun CalendarCard(
     onEveryone: () -> Unit,
     calendarName: (calendarId: String) -> String,
     onAssign: (event: ShownEvent, people: List<String>, everyTime: Boolean) -> Unit,
+    view: CalendarView,
+    onView: (CalendarView) -> Unit,
     now: LocalDateTime,
     bounded: Boolean,
     modifier: Modifier,
 ) {
+    val agendaView = view == CalendarView.Agenda || !bounded
     val colors = (owners + people).associate { it.id to it.color }
     val colorOf = { owner: String -> colors[owner] ?: Color.Gray }
     val shown = events?.forOwners(selected)
@@ -105,23 +118,30 @@ internal fun CalendarCard(
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    stringResource(R.string.dashboard_calendar),
+                    stringResource(if (agendaView) R.string.calendar_agenda_title else R.string.dashboard_calendar),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.secondary,
                 )
-                if (owners.size > 1) {
-                    Spacer(Modifier.width(16.dp))
-                    OwnerChips(owners, selected, onToggle, onEveryone)
+                Box(Modifier.weight(1f)) {
+                    if (owners.size > 1) {
+                        Box(Modifier.padding(start = 16.dp)) { OwnerChips(owners, selected, onToggle, onEveryone) }
+                    }
+                }
+                if (bounded) {
+                    Spacer(Modifier.width(12.dp))
+                    ViewSwitch(view, onView)
                 }
             }
             Spacer(Modifier.height(12.dp))
             if (bounded) {
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                     val fit = (maxWidth / MIN_DAY_WIDTH).toInt().coerceAtMost(CALENDAR_DAYS)
-                    if (fit >= MIN_GRID_DAYS) {
-                        WeekGrid(shown, now, fit, colorOf, onOpen)
-                    } else {
-                        Agenda(shown, now, colorOf, onOpen, Modifier.verticalScroll(rememberScrollState()))
+                    val columns = (maxWidth / AGENDA_COLUMN_WIDTH).toInt().coerceIn(1, MAX_AGENDA_COLUMNS)
+                    val listScroll = Modifier.verticalScroll(rememberScrollState())
+                    when {
+                        agendaView && columns > 1 -> AgendaColumns(shown, now, columns, colorOf, onOpen)
+                        !agendaView && fit >= MIN_GRID_DAYS -> WeekGrid(shown, now, fit, colorOf, onOpen)
+                        else -> Agenda(shown, now, colorOf, onOpen, listScroll)
                     }
                 }
             } else {
@@ -166,6 +186,31 @@ private fun OwnerChips(
                     selectedLabelColor = OnPersonColor,
                 ),
             )
+        }
+    }
+}
+
+/** Week or Agenda. */
+@Composable
+private fun ViewSwitch(view: CalendarView, onView: (CalendarView) -> Unit) {
+    SingleChoiceSegmentedButtonRow {
+        CalendarView.entries.forEachIndexed { index, option ->
+            SegmentedButton(
+                selected = view == option,
+                onClick = { onView(option) },
+                shape = SegmentedButtonDefaults.itemShape(index, CalendarView.entries.size),
+                // No tick: the fill already shows which is on, and the switch stays narrow.
+                icon = {},
+            ) {
+                Text(
+                    stringResource(
+                        when (option) {
+                            CalendarView.Week -> R.string.calendar_view_week
+                            CalendarView.Agenda -> R.string.calendar_view_agenda
+                        },
+                    ),
+                )
+            }
         }
     }
 }
@@ -266,6 +311,9 @@ private fun EventChip(
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (time != null) {
+                Text(time, style = MaterialTheme.typography.labelMedium, color = OnPersonColor, maxLines = 1)
+            }
             others()
         }
     } else {
@@ -288,6 +336,107 @@ private fun EventChip(
     }
 }
 
+/**
+ * The agenda on a wide card: the days ahead with something on, each with its date beside its events, running down
+ * [columns] columns (read down, then across) of about the same length. Each event shows once, under its first day
+ * still to come.
+ */
+@Composable
+private fun AgendaColumns(
+    events: List<ShownEvent>?,
+    now: LocalDateTime,
+    columns: Int,
+    colorOf: (String) -> Color,
+    onOpen: (ShownEvent) -> Unit,
+) {
+    val days = events?.let { agenda(it, now) }
+    if (days != null && days.isEmpty()) {
+        Text(
+            stringResource(R.string.calendar_agenda_empty),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    val runs = remember(days, columns) { agendaColumns(days.orEmpty(), columns) }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        runs.forEach { run ->
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.weight(1f)) {
+                run.forEach { day ->
+                    // The month under the first day shown, and wherever a new one starts.
+                    val showMonth = day == days?.firstOrNull() || day.date.dayOfMonth == 1
+                    AgendaDayRow(day, now, showMonth, colorOf, onOpen)
+                }
+            }
+        }
+        repeat(columns - runs.size) { Spacer(Modifier.weight(1f)) }
+    }
+}
+
+/** A day in the wide agenda: its weekday, date (circled today) and maybe month on the left, its events beside. */
+@Composable
+private fun AgendaDayRow(
+    day: AgendaDay,
+    now: LocalDateTime,
+    showMonth: Boolean,
+    colorOf: (String) -> Color,
+    onOpen: (ShownEvent) -> Unit,
+) {
+    val isToday = day.date == now.toLocalDate()
+    val locale = LocalConfiguration.current.locales[0]
+    Row {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(52.dp)) {
+            Text(
+                formatDate(day.date.atStartOfDay(), "EEE", locale),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent),
+            ) {
+                Text(
+                    day.date.dayOfMonth.toString(),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (isToday) OnPersonColor else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            if (showMonth) {
+                Text(
+                    formatDate(day.date.atStartOfDay(), "MMM", locale),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Column(
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 12.dp, top = 4.dp),
+        ) {
+            day.events.forEach { event ->
+                // An all-day event's fill already says so; one over several days says until when.
+                val time = if (event.allDay && event.lastDay() <= day.date) {
+                    null
+                } else {
+                    agendaTimeLabel(event, day.date, locale)
+                }
+                EventChip(event, time, past = false, colorOf) { onOpen(event) }
+            }
+        }
+    }
+}
+
 /** A list by day, for narrow screens: each event once, under its first day still to come. */
 @Composable
 private fun Agenda(
@@ -303,7 +452,7 @@ private fun Agenda(
     Column(modifier = modifier) {
         if (days != null && days.isEmpty()) {
             Text(
-                stringResource(R.string.dashboard_calendar_empty),
+                stringResource(R.string.calendar_agenda_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

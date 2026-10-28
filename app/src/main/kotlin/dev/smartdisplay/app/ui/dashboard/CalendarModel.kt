@@ -15,6 +15,9 @@ import kotlinx.serialization.json.JsonPrimitive
 /** How many days the dashboard's calendar shows, today included. */
 const val CALENDAR_DAYS = 7
 
+/** The agenda looks further ahead than the week: the events are fetched for this many days. */
+const val AGENDA_DAYS = 14
+
 /** The owner of calendars that aren't any one person's: the whole household's. */
 const val FAMILY = "family"
 
@@ -179,7 +182,7 @@ private val dayOrder = compareBy<ShownEvent>({ !it.allDay }, { it.start }, { it.
  * The events not yet over, by day for the [days] days from [now]'s, for a list. One that started on an earlier day
  * and is still going shows once, under today.
  */
-fun agenda(events: List<ShownEvent>, now: LocalDateTime, days: Int = CALENDAR_DAYS): List<AgendaDay> {
+fun agenda(events: List<ShownEvent>, now: LocalDateTime, days: Int = AGENDA_DAYS): List<AgendaDay> {
     val today = now.toLocalDate()
     val last = today.plusDays(days.toLong() - 1)
     return events
@@ -188,6 +191,33 @@ fun agenda(events: List<ShownEvent>, now: LocalDateTime, days: Int = CALENDAR_DA
         .filterKeys { it <= last }
         .toSortedMap()
         .map { (date, list) -> AgendaDay(date, list.sortedWith(dayOrder)) }
+}
+
+/**
+ * [days] split into at most [columns] runs of days, in order, for an agenda across a wide card: each run about as
+ * long as the others, counting a day's heading and each of its events as a line. Fewer runs if there aren't enough
+ * days.
+ */
+fun agendaColumns(days: List<AgendaDay>, columns: Int): List<List<AgendaDay>> {
+    if (days.isEmpty() || columns <= 1) return listOf(days)
+    val lines = days.map { 1 + it.events.size }
+    val target = lines.sum().toDouble() / columns
+    val runs = mutableListOf<MutableList<AgendaDay>>(mutableListOf())
+    var filled = 0
+    days.forEachIndexed { index, day ->
+        val run = runs.last()
+        // Start the next run once this one is full, but keep at least a day for each run still to come.
+        val daysLeft = days.size - index
+        val runsLeft = columns - runs.size
+        val full = filled + lines[index] / 2.0 > target * runs.size
+        if (run.isNotEmpty() && runsLeft > 0 && (full || daysLeft <= runsLeft)) {
+            runs += mutableListOf(day)
+        } else {
+            run += day
+        }
+        filled += lines[index]
+    }
+    return runs
 }
 
 /**

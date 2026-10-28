@@ -72,7 +72,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val now = ZonedDateTime.now()
         val today = LocalDate.now(now.zone)
         val start = today.atStartOfDay(now.zone)
-        val end = today.plusDays(CALENDAR_DAYS.toLong()).atStartOfDay(now.zone)
+        val end = today.plusDays(AGENDA_DAYS.toLong()).atStartOfDay(now.zone)
         // Through the REST API, one request per calendar, for the events' IDs (see calendarEvents).
         val events = coroutineScope {
             calendarIds.map { id ->

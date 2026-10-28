@@ -162,7 +162,7 @@ class CalendarModelTest {
                 shown("Pick-up", "2026-10-09T15:00", "2026-10-09T15:30"),
                 shown("Bins out", "2026-10-09T00:00", "2026-10-10T00:00", allDay = true),
                 shown("Football", "2026-10-11T10:00", "2026-10-11T11:00"),
-                shown("Too far", "2026-10-16T10:00", "2026-10-16T11:00"),
+                shown("Too far", "2026-10-23T10:00", "2026-10-23T11:00"),
             ),
             now,
         )
@@ -178,6 +178,36 @@ class CalendarModelTest {
         )
         assertEquals(listOf(LocalDate.parse("2026-10-09")), days.map { it.date })
         assertEquals(LocalDate.parse("2026-10-11"), days[0].events[0].lastDay())
+    }
+
+    @Test
+    fun `the list looks two weeks ahead`() {
+        val now = LocalDateTime.parse("2026-10-28T09:00")
+        val days = agenda(
+            listOf(
+                shown("Soon", "2026-11-10T10:00", "2026-11-10T11:00"),
+                shown("Too far", "2026-11-11T10:00", "2026-11-11T11:00"),
+            ),
+            now,
+        )
+        assertEquals(listOf("Soon"), days.flatMap { day -> day.events.map { it.summary } })
+    }
+
+    @Test
+    fun `agenda columns split the days in order, about evenly, and never leave a column empty`() {
+        val start = LocalDate.parse("2026-10-28")
+        fun day(offset: Long, events: Int) = AgendaDay(
+            start.plusDays(offset),
+            List(events) { shown("E$it", "2026-10-28T10:00", "2026-10-28T11:00") },
+        )
+        val days = listOf(day(0, 3), day(1, 1), day(2, 1), day(3, 3), day(4, 1), day(5, 1))
+        val runs = agendaColumns(days, 2)
+        assertEquals(days, runs.flatten())
+        assertEquals(listOf(3, 3), runs.map { it.size })
+        // Two days in three columns: two columns, a day each.
+        assertEquals(listOf(1, 1), agendaColumns(days.take(2), 3).map { it.size })
+        assertEquals(listOf(days), agendaColumns(days, 1))
+        assertEquals(listOf(emptyList<AgendaDay>()), agendaColumns(emptyList(), 3))
     }
 
     @Test

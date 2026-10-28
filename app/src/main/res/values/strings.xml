@@ -115,7 +115,10 @@
     <string name="dashboard_no_people">People show here once they\'re in Home Assistant (Settings, People), with the Home Assistant app on their phones.</string>
     <string name="dashboard_no_buttons">Choose buttons for your scenes, scripts and automations: long-press the dashboard, then Sources on this card.</string>
     <string name="dashboard_calendar">This week</string>
-    <string name="dashboard_calendar_empty">Nothing in the next week.</string>
+    <string name="calendar_agenda_title">Coming up</string>
+    <string name="calendar_agenda_empty">Nothing in the next two weeks.</string>
+    <string name="calendar_view_week">Week</string>
+    <string name="calendar_view_agenda">Agenda</string>
     <string name="pin_arrange_dashboard">Arrange cards</string>
     <string name="dashboard_edit_sources">Sources</string>
     <string name="dashboard_edit_hide">Hide</string>
