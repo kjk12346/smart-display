@@ -114,8 +114,8 @@ Home Assistant.
   buttons, and the weather entity, which the clock screen shares); Add card. Calendar, Who's home and Buttons are one
   each and use `KitchenConfig`; Devices (an area's controls plus picked ones, via `ControlCard`), Sensors, Now
   playing and Camera (`entity_picture` refreshed every 10 s) keep their own sources and can be added more than
-  once. A new card must fit on the grid on screen; on the other, the biggest cards shrink a row or column to make
-  room. Checked on the 15.6" tablet: PIN prompt, resize, move, Add card's list. The new card types aren't yet
+  once. A new card goes in the first free space on each grid; where there's none, the biggest card
+  shrinks a row (or column) and the cards slide up, until it fits. Checked on the 15.6" tablet: PIN prompt, resize, move, adding a Devices card for a room. The new card types aren't yet
   checked against real devices.
 - **Burn-in:** by day the dashboard gives way to the clock over the photos (the ambient screen, which already drifts)
   after `KitchenConfig.screensaverMinutes` untouched (Settings, default 10, or never); at night after 2 minutes, as

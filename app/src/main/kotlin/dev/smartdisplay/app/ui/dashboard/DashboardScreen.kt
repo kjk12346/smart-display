@@ -38,7 +38,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -71,7 +70,6 @@ import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.kiosk.CardType
 import dev.smartdisplay.app.kiosk.DashCard
 import dev.smartdisplay.app.kiosk.DashLayout
-import dev.smartdisplay.app.kiosk.Grid
 import dev.smartdisplay.app.kiosk.KitchenConfig
 import dev.smartdisplay.app.kiosk.TALL_GRID
 import dev.smartdisplay.app.kiosk.WIDE_GRID
@@ -202,7 +200,6 @@ fun DashboardScreen(
     var choosingWeather by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
     var sourcesOf by remember { mutableStateOf<String?>(null) }
-    var shownGrid by remember { mutableStateOf(WIDE_GRID) }
     val layout = kitchen.layout
     val onLayoutChange = { changed: DashLayout -> onKitchenChange(kitchen.copy(layout = changed)) }
     val navButtons: @Composable () -> Unit = {
@@ -341,7 +338,6 @@ fun DashboardScreen(
         CompositionLocalProvider(LocalOverPhoto provides (photoUrl != null)) {
             DashboardLayout(
                 header, layout, editing, onLayoutChange, onSources = { sourcesOf = it.id }, cardContent, driftX, driftY,
-                onGrid = { shownGrid = it },
             )
         }
     }
@@ -355,7 +351,7 @@ fun DashboardScreen(
             onAdd = { type ->
                 val name = type.name.lowercase()
                 val id = if (type.single) name else "$name-${System.currentTimeMillis()}"
-                val added = layout.add(type, id, shownGrid)
+                val added = layout.add(type, id)
                 if (added != null) {
                     onLayoutChange(added)
                     adding = false
@@ -393,8 +389,6 @@ private fun DashboardLayout(
     cardContent: @Composable (DashCard, Modifier, Boolean) -> Unit,
     driftX: Dp,
     driftY: Dp,
-    /** Told which grid is on screen, the one cards are added to first. */
-    onGrid: (Grid) -> Unit,
 ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -406,7 +400,6 @@ private fun DashboardLayout(
         val wide = maxWidth > maxHeight && maxWidth >= 720.dp
         val tablet = wide || maxWidth >= 600.dp
         val grid = if (wide) WIDE_GRID else TALL_GRID
-        SideEffect { onGrid(grid) }
         // Bigger on bigger screens: 56 dp on a phone, up to 80 on a big tablet.
         val clock = ((if (wide) maxHeight else maxWidth) * 0.11f).coerceIn(56.dp, 80.dp)
         if (tablet) {

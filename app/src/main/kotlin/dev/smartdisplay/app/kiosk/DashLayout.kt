@@ -79,31 +79,42 @@ data class DashLayout(val cards: List<DashCard> = DEFAULT_CARDS) {
     fun addable(): List<CardType> = CardType.entries.filter { type -> !type.single || cards.none { it.type == type } }
 
     /**
-     * Adds a card of [type] in the first free space on [shown] (the grid on screen), as big as it usually is or as
-     * big as fits there; null when there's no room even for the smallest card. On the other grid, which nobody is
-     * looking at, the biggest cards give up a row or column at a time until it fits.
+     * Adds a card of [type] on both grids, in the first free space, as big as it usually is or as big as fits there.
+     * Where there's no room even for the smallest card, the biggest cards give up a row or column at a time until it
+     * fits; null only when every card is already as small as it goes.
      */
-    fun add(type: CardType, id: String, shown: Grid): DashLayout? {
-        val size = DEFAULT_SIZES.getValue(type)
-        val other = if (shown == WIDE_GRID) TALL_GRID else WIDE_GRID
-        val here = freeSpot(shown, if (shown == WIDE_GRID) size.first else size.second) ?: return null
+    fun add(type: CardType, id: String): DashLayout? {
+        val (wideSize, tallSize) = DEFAULT_SIZES.getValue(type)
         var layout = this
-        var there = layout.freeSpot(other, if (other == WIDE_GRID) size.first else size.second)
-        while (there == null) {
-            layout = layout.shrinkBiggest(other) ?: return null
-            there = layout.freeSpot(other, if (other == WIDE_GRID) size.first else size.second)
+        var wide = layout.freeSpot(WIDE_GRID, wideSize)
+        while (wide == null) {
+            layout = layout.shrinkBiggest(WIDE_GRID) ?: return null
+            wide = layout.freeSpot(WIDE_GRID, wideSize)
         }
-        val (wide, tall) = if (shown == WIDE_GRID) here to there else there to here
+        var tall = layout.freeSpot(TALL_GRID, tallSize)
+        while (tall == null) {
+            layout = layout.shrinkBiggest(TALL_GRID) ?: return null
+            tall = layout.freeSpot(TALL_GRID, tallSize)
+        }
         return layout.copy(cards = layout.cards + DashCard(id, type, wide, tall))
     }
 
-    /** The biggest card on [grid] that can shrink, a row shorter (or else a column narrower); null if none can. */
+    /**
+     * The biggest card on [grid] that can shrink, a row shorter (or else a column narrower), then every card slid up
+     * into any space above it, so the room gathers at the bottom; null if no card can shrink.
+     */
     private fun shrinkBiggest(grid: Grid): DashLayout? {
         val card = cards.filter { it.rect(grid).let { r -> r.w > MIN_CARD_CELLS || r.h > MIN_CARD_CELLS } }
             .maxByOrNull { it.rect(grid).let { r -> r.w * r.h } } ?: return null
         val rect = card.rect(grid)
         val smaller = if (rect.h > MIN_CARD_CELLS) rect.copy(h = rect.h - 1) else rect.copy(w = rect.w - 1)
-        return update(card.withRect(grid, smaller))
+        var layout = update(card.withRect(grid, smaller))
+        for (id in layout.cards.sortedWith(compareBy({ it.rect(grid).y }, { it.rect(grid).x })).map { it.id }) {
+            val at = layout.cards.first { it.id == id }.rect(grid)
+            val highest = (0 until at.y).firstOrNull { y -> layout.canPlace(id, grid, at.copy(y = y)) } ?: continue
+            layout = layout.move(id, grid, at.copy(y = highest))
+        }
+        return layout
     }
 
     /** The first space on [grid], row by row, for a card [wanted] big, shrinking it toward the smallest if needed. */

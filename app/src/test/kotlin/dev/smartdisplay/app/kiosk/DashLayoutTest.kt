@@ -37,25 +37,33 @@ class DashLayoutTest {
     }
 
     @Test
-    fun `adding finds free space, shrinking the card if it has to, and gives up when full`() {
+    fun `adding finds free space, shrinking the new card if it has to`() {
         val layout = DashLayout().remove("buttons")
-        val added = layout.add(CardType.Sensors, "sensors-1", WIDE_GRID)!!
+        val added = layout.add(CardType.Sensors, "sensors-1")!!
         val sensors = added.cards.first { it.id == "sensors-1" }
         assertEquals(CardRect(9, 4, 3, 3), sensors.wide)
         assertEquals(CardRect(3, 7, 3, 3), sensors.tall)
-        // The default layout has no room left on the grid on screen.
-        assertNull(DashLayout().add(CardType.Camera, "camera-1", WIDE_GRID))
-        assertNull(DashLayout().add(CardType.Camera, "camera-1", TALL_GRID))
     }
 
     @Test
-    fun `on the grid not on screen, the biggest card makes room`() {
-        val layout = DashLayout().move("calendar", WIDE_GRID, CardRect(0, 0, 6, 8))
-        val added = layout.add(CardType.Sensors, "sensors-1", WIDE_GRID)!!
-        assertEquals(CardRect(6, 0, 3, 3), added.cards.first { it.id == "sensors-1" }.wide)
-        // Portrait was full: the calendar gave up two rows, and the sensors went under it.
+    fun `with no room, the biggest card makes room`() {
+        val added = DashLayout().add(CardType.Sensors, "sensors-1")!!
+        // The calendar gave up two rows each way (one wouldn't leave room even for the smallest card).
+        assertEquals(CardRect(0, 0, 9, 6), added.cards.first { it.id == "calendar" }.wide)
         assertEquals(CardRect(0, 0, 6, 5), added.cards.first { it.id == "calendar" }.tall)
-        assertEquals(CardRect(0, 5, 3, 2), added.cards.first { it.id == "sensors-1" }.tall)
+        assertEquals(CardRect(0, 6, 3, 2), added.cards.first { it.id == "sensors-1" }.wide)
+        // In portrait, Who's home and Buttons slid up under it, and the new card went at the bottom.
+        assertEquals(CardRect(0, 10, 3, 2), added.cards.first { it.id == "sensors-1" }.tall)
+    }
+
+    @Test
+    fun `adding gives up only when every card is as small as it goes`() {
+        var layout = DashLayout(emptyList())
+        var n = 0
+        while (true) layout = layout.add(CardType.Sensors, "s${n++}") ?: break
+        // Many cards fit, shrunk as needed, before the grids run out.
+        assertTrue(layout.cards.size >= 12)
+        assertNull(layout.add(CardType.Sensors, "one-more"))
     }
 
     @Test
@@ -68,7 +76,7 @@ class DashLayoutTest {
 
     @Test
     fun `the layout survives saving`() {
-        val layout = DashLayout().remove("buttons").add(CardType.Devices, "devices-1", WIDE_GRID)!!.let { added ->
+        val layout = DashLayout().remove("buttons").add(CardType.Devices, "devices-1")!!.let { added ->
             added.update(added.cards.last().copy(areaId = "kitchen", entities = listOf("light.a", "switch.b")))
         }
         assertEquals(layout, decodeLayout(encodeLayout(layout)))

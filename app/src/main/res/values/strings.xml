@@ -91,7 +91,7 @@
     <string name="dashboard_edit_weather">Weather</string>
     <string name="dashboard_edit_add">Add card</string>
     <string name="dashboard_edit_done">Done arranging</string>
-    <string name="dashboard_edit_full">There\'s no room for another card. Make one smaller, or hide one, first.</string>
+    <string name="dashboard_edit_full">Every card is already as small as it goes. Hide one to make room.</string>
     <string name="card_devices">Devices</string>
     <string name="card_sensors">Sensors</string>
     <string name="card_now_playing">Now playing</string>
