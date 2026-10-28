@@ -153,9 +153,11 @@ Home Assistant.
   15.6" tablet: PIN prompt, resize, move, adding a Devices card for a room. The new card types aren't yet checked
   against real devices.
 - **Status bar (added 2026-10-28):** chips under the weather in the header (`StatusBar.kt`), chosen while arranging
-  ("Status bar"; `KitchenConfig.statusEntities`). Sensors and alarm panels always show; binary sensors, locks and
-  covers only while open, unlocked or on (`statusChip` in `CardModels.kt`). Safety classes (smoke, leak, problem…),
-  jammed locks and a triggered alarm are tinted as alerts. Not yet checked on a device with chips chosen.
+  ("Status bar"; `KitchenConfig.statusEntities`). Every chosen one always shows with its state (since 0.1.16, the
+  owner's choice): a sensor's value, open / closed, locked / unlocked, detected / clear and so on (`statusChip` in
+  `CardModels.kt`), as small chips (a dot, name, state; 30 dp tall). Open, unlocked or on is tinted with a lit dot;
+  safety classes (smoke, leak, problem…) when on, jammed locks and a triggered alarm are red. Checked on the 15.6"
+  tablet with the patio door (Closed).
 - **Weather (2026-10-28, the owner chose "hours" plus a card):** the header shows now (with today's high / low) and
   the next 6 hours (`HourlyStrip` in `Weather.kt`; `weather.get_forecasts` `type: hourly`, fetched with the daily one
   in `AmbientViewModel`); integrations without hourly forecasts fall back to the days. Night icons per hour from

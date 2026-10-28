@@ -71,7 +71,7 @@ class CardModelsTest {
     }
 
     @Test
-    fun `the status bar shows sensors always, and doors and locks only when they need a look`() {
+    fun `the status bar shows each chosen thing with its state, closed and locked included`() {
         val door = """{"friendly_name":"Back door","device_class":"door"}"""
         val smoke = """{"friendly_name":"Smoke","device_class":"smoke"}"""
         val home = HomeState(
@@ -94,10 +94,13 @@ class CardModelsTest {
             listOf(
                 StatusChip("sensor.water", "Hot water", value = "45 °C"),
                 StatusChip("binary_sensor.door_open", "Back door", word = StatusWord.Open),
+                StatusChip("binary_sensor.door_shut", "Back door", word = StatusWord.Closed),
                 StatusChip("binary_sensor.smoke", "Smoke", word = StatusWord.Detected, alert = true),
+                StatusChip("lock.front", "lock.front", word = StatusWord.Locked),
                 StatusChip("lock.back", "lock.back", word = StatusWord.Unlocked),
                 StatusChip("lock.side", "lock.side", word = StatusWord.Jammed, alert = true),
                 StatusChip("cover.garage", "cover.garage", word = StatusWord.Open),
+                StatusChip("cover.blind", "cover.blind", word = StatusWord.Closed),
                 StatusChip("alarm_control_panel.home", "alarm_control_panel.home", word = StatusWord.ArmedAway),
             ),
             chips,

@@ -132,7 +132,8 @@
     <string name="dashboard_reset_tall_body">In portrait, the calendar, Who\'s home and Buttons go back where they started, and any other cards fit in around them. Landscape stays as it is.</string>
     <string name="dashboard_reset_confirm">Put back</string>
     <string name="status_choose">Status bar</string>
-    <string name="status_note">Chips across the top of the dashboard. Sensors and alarm panels always show; doors, windows, locks and other on/off things only while they\'re open, unlocked or on.</string>
+    <string name="status_note">Small chips across the top of the dashboard, each with what it\'s doing now: open or closed, locked or unlocked, a sensor\'s reading. Anything open, unlocked or on is highlighted.</string>
+    <string name="status_locked">Locked</string>
     <string name="status_unlocked">Unlocked</string>
     <string name="status_jammed">Jammed</string>
     <string name="status_disarmed">Disarmed</string>
