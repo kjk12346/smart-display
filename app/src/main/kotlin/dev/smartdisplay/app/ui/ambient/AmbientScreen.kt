@@ -219,8 +219,9 @@ private fun AmbientContent(
         if (wallpaperUrl != null) WallpaperBackground(wallpaperUrl, wallpaperIntervalMillis)
         if (sunrise != null) SunriseGlow(sunrise)
         val landscape = maxWidth > maxHeight
-        // The clock's digit height drives everything else's size.
-        val clock = if (landscape) minOf(maxHeight * 0.30f, maxWidth * 0.15f) else minOf(maxWidth * 0.26f, maxHeight * 0.15f)
+        // The clock's digit height drives everything else's size. Capped, so a big tablet's clock isn't overwhelming.
+        val fit = if (landscape) minOf(maxHeight * 0.30f, maxWidth * 0.15f) else minOf(maxWidth * 0.26f, maxHeight * 0.15f)
+        val clock = minOf(fit, 150.dp)
 
         Box(
             modifier = Modifier

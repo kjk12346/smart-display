@@ -46,6 +46,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -183,10 +185,10 @@ fun DashboardScreen(
         }
     }
     // Wide: one row. Narrow: the clock and weather, then the forecast, then the buttons, each on its own line.
-    val header: @Composable (wide: Boolean) -> Unit = { wide ->
+    val header: @Composable (wide: Boolean, clock: Dp) -> Unit = { wide, clock ->
         if (wide) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Clock(now, nextAlarm, size = 56.dp, alignment = Alignment.Start)
+                Clock(now, nextAlarm, size = clock, alignment = Alignment.Start)
                 Spacer(Modifier.weight(1f))
                 currentWeather()
                 ForecastStrip(days, today = now.toLocalDate())
@@ -198,7 +200,7 @@ fun DashboardScreen(
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Clock(now, nextAlarm, size = 56.dp, alignment = Alignment.Start)
+                    Clock(now, nextAlarm, size = clock, alignment = Alignment.Start)
                     Spacer(Modifier.weight(1f))
                     currentWeather()
                 }
@@ -263,8 +265,10 @@ fun DashboardScreen(
             .offset(driftX, driftY),
     ) {
         if (maxWidth > maxHeight && maxWidth >= 720.dp) {
+            // Bigger on taller screens: 56 dp on a phone in landscape, about 80 on a big tablet.
+            val clock = (maxHeight * 0.11f).coerceIn(56.dp, 80.dp)
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                header(true)
+                header(true, clock)
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.weight(1f)) {
                     if (showCalendar) {
                         calendarCard(Modifier.weight(2.6f).fillMaxHeight(), true)
@@ -288,11 +292,13 @@ fun DashboardScreen(
                 }
             }
         } else {
+            // A phone's width keeps 56 dp; a tablet in portrait gets up to 80.
+            val clock = (maxWidth * 0.11f).coerceIn(56.dp, 80.dp)
             Column(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
-                header(false)
+                header(false, clock)
                 if (showCalendar) calendarCard(Modifier.fillMaxWidth(), false)
                 peopleCard(Modifier.fillMaxWidth(), false)
                 buttonsCard(Modifier.fillMaxWidth(), false)
