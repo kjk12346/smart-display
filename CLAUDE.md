@@ -279,7 +279,9 @@ Home Assistant.
    media players (play/pause, volume hidden until the name is tapped), thermostats (mode, setpoints).
    - **Done:** `ui/controls/`. Tap the clock to open; Done, Back or 2 minutes idle returns. Rooms come from areas
      (entity's area, else its device's), plus "Other"; hidden, disabled and config/diagnostic entities are skipped.
-     Names drop the room prefix and a doubled device name. No optimistic UI: cards follow Home Assistant's state
+     Names drop the room prefix and a doubled device name. The chosen room is kept (`KioskConfig.lastRoom`, saved
+     by `KioskStore`, added 2026-10-28), so the display reopens on it after the clock, the power button, a reboot or
+     an update; a room that's gone falls back to the first. No optimistic UI: cards follow Home Assistant's state
      events; sliders and thermostat steppers hold the sent value until the state confirms it (or 5 s).
    - Home Assistant rejects a command id lower than one it has seen (`id_reuse`); `LiveConnection.command()` numbers
      and queues under one lock for that reason. `FakeHomeAssistant` enforces the same rule.

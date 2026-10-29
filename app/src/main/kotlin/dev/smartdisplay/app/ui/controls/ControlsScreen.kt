@@ -38,7 +38,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +52,7 @@ import dev.smartdisplay.app.R
 import dev.smartdisplay.app.ha.ConnectionStatus
 import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.kiosk.GuestConfig
+import dev.smartdisplay.app.kiosk.KioskConfig
 import dev.smartdisplay.app.ui.common.WifiDialog
 import dev.smartdisplay.app.kiosk.WifiConfig
 import dev.smartdisplay.app.ui.common.ReturnWhenIdle
@@ -80,6 +80,10 @@ fun ControlsScreen(
     guest: GuestConfig?,
     /** The Wi-Fi to offer guests as a QR code, if one is set; only shown in guest mode. */
     wifi: WifiConfig?,
+    /** The room shown last time (its key, from [KioskConfig.lastRoom]); shown again if it still exists. */
+    lastRoom: String?,
+    /** Called with a room's key when one is chosen, to remember it. */
+    onRoomChosen: (String) -> Unit,
     onDone: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAlarms: () -> Unit,
@@ -87,8 +91,9 @@ fun ControlsScreen(
 ) {
     BackHandler(onBack = onDone)
     val rooms = remember(home.entities, home.areas, home.devices, home.registry) { home.rooms() }
-    var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
-    val selected = rooms.firstOrNull { it.key == selectedKey } ?: rooms.firstOrNull()
+    // The chosen room is kept by the owner of lastRoom, so it's still there after the clock, the power button and
+    // a restart; one that no longer exists falls back to the first.
+    val selected = rooms.firstOrNull { it.key == lastRoom } ?: rooms.firstOrNull()
 
     val snackbar = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -120,7 +125,7 @@ fun ControlsScreen(
                         RoomList(
                             rooms = rooms,
                             selected = selected,
-                            onSelect = { selectedKey = it.key },
+                            onSelect = { onRoomChosen(it.key) },
                             modifier = Modifier
                                 .width(240.dp)
                                 .fillMaxHeight()
@@ -135,7 +140,7 @@ fun ControlsScreen(
                 } else {
                     Column {
                         Header(null, home, onDone, onOpenSettings, onOpenAlarms)
-                        RoomChips(rooms, selected, onSelect = { selectedKey = it.key })
+                        RoomChips(rooms, selected, onSelect = { onRoomChosen(it.key) })
                         RoomGrid(home, selected, call)
                     }
                 }

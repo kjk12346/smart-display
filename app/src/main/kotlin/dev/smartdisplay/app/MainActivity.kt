@@ -361,6 +361,8 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                     home = home,
                     guest = kiosk.guest.takeIf { kiosk.isGuest },
                     wifi = kiosk.wifi,
+                    lastRoom = kiosk.lastRoom,
+                    onRoomChosen = app.kiosk::setLastRoom,
                     onDone = { screen = rest },
                     onOpenSettings = openSettings,
                     onOpenAlarms = { screen = Screen.Alarms },
