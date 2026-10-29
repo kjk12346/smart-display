@@ -11,6 +11,7 @@ import dev.smartdisplay.app.kiosk.KioskConfig
 import dev.smartdisplay.app.kiosk.KitchenConfig
 import dev.smartdisplay.app.kiosk.PinCheck
 import dev.smartdisplay.app.kiosk.WifiConfig
+import dev.smartdisplay.app.kiosk.SpeakerConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
@@ -62,6 +63,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun setWifi(wifi: WifiConfig) = kiosk.setWifi(wifi)
+
+    fun setSpeaker(speaker: SpeakerConfig) = kiosk.setSpeaker(speaker)
 
     fun setClockCorner(corner: Boolean) {
         kiosk.setWallpaper(config.value.wallpaper.copy(clockCorner = corner))

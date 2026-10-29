@@ -45,6 +45,11 @@ import dev.smartdisplay.app.ui.common.LocalWindowBrightness
 import dev.smartdisplay.app.ui.common.LockTask
 import dev.smartdisplay.app.ui.common.ReturnWhenIdle
 import dev.smartdisplay.app.ui.winddown.WindDownOverlay
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.Alignment
+import dev.smartdisplay.app.ui.common.NowPlayingBar
+import dev.smartdisplay.app.speaker.Speaker
+import dev.smartdisplay.app.kiosk.defaultSpeakerName
 import dev.smartdisplay.app.ui.common.rememberMinuteClock
 import dev.smartdisplay.app.ui.common.WindowBrightness
 import dev.smartdisplay.app.ui.common.rememberLocalNetworkAccess
@@ -269,6 +274,11 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
     val server by app.serverStore.server.collectAsStateWithLifecycle()
     val session by app.session.state.collectAsStateWithLifecycle()
     val kiosk by app.kiosk.config.collectAsStateWithLifecycle()
+    // The speaker needs the local network, not Home Assistant: it runs from here, signed in or not.
+    val speakerName = kiosk.speaker.name ?: stringResource(defaultSpeakerName(kiosk.mode))
+    LaunchedEffect(kiosk.speaker.enabled, speakerName) {
+        app.speaker.configure(Speaker.Settings(kiosk.speaker.enabled, speakerName, app.kiosk.speakerUdn()))
+    }
 
     val current = server
     when {
@@ -370,6 +380,9 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
             // A wind-down under way shows over the resting screens and Controls, not over Alarms or Settings.
             if (screen == Screen.Ambient || screen == Screen.Dashboard || screen == Screen.Controls) {
                 WindDownOverlay(home, kiosk.kitchen.hiddenCalendars)
+                // At the top over the clock, whose corners are taken; at the bottom elsewhere, under the headers.
+                val barAt = if (screen == Screen.Ambient) Alignment.TopCenter else Alignment.BottomCenter
+                NowPlayingBar(app.speaker, barAt)
             }
             if (askingPin) {
                 EnterPinDialog(

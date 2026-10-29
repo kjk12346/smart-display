@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Only enforced for apps targeting API 37+; raising targetSdk to 37 also needs a runtime request. -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <!-- The speaker: Android drops multicast on Wi-Fi without a lock, and Home Assistant finds speakers by it. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <!-- Alarms: exact alarm-clock scheduling (USE_EXACT_ALARM from API 33, SCHEDULE_EXACT_ALARM before), the ringing
          service and its full-screen notification, and rescheduling after a reboot. -->

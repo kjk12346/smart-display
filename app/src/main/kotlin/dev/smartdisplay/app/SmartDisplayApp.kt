@@ -12,6 +12,7 @@ import dev.smartdisplay.app.auth.Session
 import dev.smartdisplay.app.ha.HomeAssistantClient
 import dev.smartdisplay.app.kiosk.KioskStore
 import dev.smartdisplay.app.server.ServerStore
+import dev.smartdisplay.app.speaker.Speaker
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,12 @@ class SmartDisplayApp : Application(), SingletonImageLoader.Factory {
 
     /** The live connection; it connects only while a screen is collecting its state. */
     val home by lazy { HomeAssistantClient(http, session, { serverStore.server.value?.url }, appScope) }
+
+    /** The display as a speaker for Home Assistant; started and stopped from the display's content. */
+    val speaker by lazy {
+        val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull()
+        Speaker(this, http, appScope, version ?: "?")
+    }
 
     /** Coil, for wallpaper photos, over the same HTTP client. */
     override fun newImageLoader(context: PlatformContext): ImageLoader =

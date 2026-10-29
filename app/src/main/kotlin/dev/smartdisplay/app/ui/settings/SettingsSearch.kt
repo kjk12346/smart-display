@@ -28,6 +28,8 @@ internal val SEARCH_TOPICS = listOf(
     SearchTopic(SettingsPage.Display, R.string.wallpaper_photo_info, R.string.search_kw_photo_info),
     SearchTopic(SettingsPage.Wifi, R.string.settings_wifi, R.string.search_kw_wifi),
     SearchTopic(SettingsPage.Wifi, R.string.settings_wifi_hidden, R.string.search_kw_wifi),
+    SearchTopic(SettingsPage.Speaker, R.string.settings_speaker_enable, R.string.search_kw_speaker),
+    SearchTopic(SettingsPage.Speaker, R.string.settings_speaker_name, R.string.search_kw_speaker),
     SearchTopic(SettingsPage.Alarms, R.string.alarm_sound, R.string.search_kw_alarm_sound),
     SearchTopic(SettingsPage.Alarms, R.string.alarm_lights, R.string.search_kw_alarm),
     SearchTopic(SettingsPage.Alarms, R.string.alarm_speaker, R.string.search_kw_alarm_speaker),

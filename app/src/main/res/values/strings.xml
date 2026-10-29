@@ -40,6 +40,20 @@
     <string name="settings_eyebrow">Settings</string>
     <string name="settings_done">Done</string>
     <string name="cancel">Cancel</string>
+    <string name="settings_speaker">Speaker</string>
+    <string name="settings_speaker_off">Off</string>
+    <string name="settings_speaker_enable">Play from Home Assistant</string>
+    <string name="settings_speaker_enable_body">Lets Home Assistant find this display as a speaker (DLNA) and play music, radio or announcements on it, from its media panel, automations or Music Assistant.</string>
+    <string name="settings_speaker_name">Name in Home Assistant</string>
+    <string name="settings_speaker_how">In Home Assistant, go to Settings &gt; Devices &amp; services: “%1$s” should show as discovered (DLNA Digital Media Renderer). Add it, and it\'s a media player like the other speakers. Sound comes out of this display, or a Bluetooth speaker paired with it.</string>
+    <string name="speaker_default_owner">Smart display</string>
+    <string name="speaker_default_kitchen">Kitchen display</string>
+    <string name="speaker_default_guest">Guest room display</string>
+    <string name="speaker_playing">Playing from Home Assistant</string>
+    <string name="speaker_pause">Pause</string>
+    <string name="speaker_play">Play</string>
+    <string name="speaker_stop">Stop</string>
+    <string name="search_kw_speaker">speaker music audio dlna play sound radio announcements media player bluetooth</string>
     <string name="settings_search">Search settings</string>
     <string name="settings_search_none">No settings match “%1$s”.</string>
     <!-- Words someone might search settings with, besides each setting's heading. Never shown. -->

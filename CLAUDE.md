@@ -101,6 +101,31 @@ Home Assistant.
   then want to pause or turn it down. No TV to check against yet (a guest-room TV is planned); the Wi-Fi QR and the
   TV controls are unit-tested only.
 
+## The display as a speaker (added 2026-10-28)
+
+- Settings > Speaker: "Play from Home Assistant" (off by default) and the name Home Assistant shows (default from
+  the display type: Smart display / Kitchen display / Guest room display). The display is then a DLNA media
+  renderer (UPnP AV MediaRenderer:1) that Home Assistant's DLNA Digital Media Renderer integration finds and adds as
+  a `media_player`: play_media (media sources, TTS, Radio Browser, Music Assistant), play / pause / stop / seek,
+  volume and mute (Android's media volume). One stream at a time, no gapless next track, no sync with other speakers.
+- Code in `speaker/`: `Upnp.kt` (pure: device and service descriptions, SOAP calls and answers, DIDL-Lite,
+  LastChange events; unit-tested), `MiniHttpServer.kt` (HTTP/1.1 incl. SUBSCRIBE/UNSUBSCRIBE, one request per
+  connection, port 49494 if free), `Ssdp.kt` (alive every 5 min, answers M-SEARCH, byebye; holds a Wi-Fi multicast
+  lock, CHANGE_WIFI_MULTICAST_STATE), `Speaker.kt` (Media3 ExoPlayer 1.11.1 on the main thread, GENA events to Home
+  Assistant's callback on every transport change and on any media volume change, via a ContentObserver).
+  `SmartDisplayApp.speaker`; started from `AppContent` (after the local network permission), so it runs whichever
+  screen shows, signed in or not. Its UPnP UDN is made once and kept (`KioskStore.speakerUdn`), so it stays the
+  same device in Home Assistant. A new address (DHCP) restarts it.
+- `NowPlayingBar` (title, artist, art; pause, stop) shows while something plays or is paused: at the top over the
+  clock, at the bottom over the dashboard and Controls.
+- Home Assistant listed it under the DLNA integration's "add" form but raised no discovery notice (it doesn't for the
+  owner's other DLNA device either); add it there by hand. It caches the description per address, so a rename can
+  show the old name until the entry is re-added. Home Assistant's DIDL for media sources says "Home Assistant" as the
+  title. No foreground service: playing relies on the kiosk keeping the app on screen.
+- Checked on the 15.6" tablet with Home Assistant (2026-10-28): discovered, added, TTS played, a radio station
+  played with the bar showing, pause / play / volume / stop from Home Assistant with its state following. Not yet:
+  a volume change on the tablet reaching Home Assistant, Music Assistant, seeking, old or Fire tablets.
+
 ## Family / kitchen display (added 2026-10-09)
 
 - A third display type (Settings > "Who uses this display"). By day a dashboard (`ui/dashboard/`): clock, weather

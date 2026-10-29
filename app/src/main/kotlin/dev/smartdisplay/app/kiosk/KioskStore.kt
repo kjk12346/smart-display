@@ -1,5 +1,6 @@
 package dev.smartdisplay.app.kiosk
 
+import dev.smartdisplay.app.speaker.newSpeakerUdn
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
@@ -27,6 +28,8 @@ data class KioskConfig(
     val kitchen: KitchenConfig = KitchenConfig(),
     /** The Wi-Fi guests join, shown as a QR code. */
     val wifi: WifiConfig = WifiConfig(),
+    /** The display as a speaker Home Assistant can play to. */
+    val speaker: SpeakerConfig = SpeakerConfig(),
 ) {
     val isGuest: Boolean get() = mode == DisplayMode.Guest
     val isKitchen: Boolean get() = mode == DisplayMode.Kitchen
@@ -86,6 +89,15 @@ class KioskStore(context: Context) {
         putString(KEY_KITCHEN_SHORTCUT_ICONS, encodeMap(kitchen.shortcutIcons))
         putString(KEY_KITCHEN_CALENDAR_VIEW, kitchen.calendarView.name)
     }
+
+    fun setSpeaker(speaker: SpeakerConfig) = update {
+        putBoolean(KEY_SPEAKER_ON, speaker.enabled)
+        putString(KEY_SPEAKER_NAME, speaker.name)
+    }
+
+    /** The speaker's UPnP identity, made the first time it's asked for and kept, so it stays the same speaker. */
+    fun speakerUdn(): String = prefs.getString(KEY_SPEAKER_UDN, null)
+        ?: newSpeakerUdn().also { udn -> prefs.edit { putString(KEY_SPEAKER_UDN, udn) } }
 
     fun setWifi(wifi: WifiConfig) = update {
         putString(KEY_WIFI_SSID, wifi.ssid?.takeIf { it.isNotBlank() })
@@ -175,6 +187,10 @@ class KioskStore(context: Context) {
                 ?: WifiSecurity.Wpa,
             hidden = prefs.getBoolean(KEY_WIFI_HIDDEN, false),
         ),
+        speaker = SpeakerConfig(
+            enabled = prefs.getBoolean(KEY_SPEAKER_ON, false),
+            name = prefs.getString(KEY_SPEAKER_NAME, null),
+        ),
     )
 
     private companion object {
@@ -205,6 +221,9 @@ class KioskStore(context: Context) {
         const val KEY_KITCHEN_HIDDEN_PEOPLE = "kitchen_hidden_people"
         const val KEY_KITCHEN_WEATHER = "kitchen_weather"
         const val KEY_KITCHEN_STATUS = "kitchen_status"
+        const val KEY_SPEAKER_ON = "speaker_on"
+        const val KEY_SPEAKER_NAME = "speaker_name"
+        const val KEY_SPEAKER_UDN = "speaker_udn"
         const val KEY_WIFI_SSID = "wifi_ssid"
         const val KEY_WIFI_PASSWORD = "wifi_password"
         const val KEY_WIFI_SECURITY = "wifi_security"
