@@ -30,6 +30,8 @@ data class KioskConfig(
     val wifi: WifiConfig = WifiConfig(),
     /** The display as a speaker Home Assistant can play to. */
     val speaker: SpeakerConfig = SpeakerConfig(),
+    /** The room last chosen on the controls screen (its key), shown again when it reopens. */
+    val lastRoom: String? = null,
 ) {
     val isGuest: Boolean get() = mode == DisplayMode.Guest
     val isKitchen: Boolean get() = mode == DisplayMode.Kitchen
@@ -57,6 +59,8 @@ class KioskStore(context: Context) {
     fun setPinApp(on: Boolean) = update { putBoolean(KEY_PIN_APP, on) }
 
     fun setMode(mode: DisplayMode) = update { putString(KEY_MODE, mode.name) }
+
+    fun setLastRoom(key: String?) = update { putString(KEY_LAST_ROOM, key) }
 
     fun setGuest(guest: GuestConfig) = update {
         putString(KEY_GUEST_AREA, guest.areaId)
@@ -191,6 +195,7 @@ class KioskStore(context: Context) {
             enabled = prefs.getBoolean(KEY_SPEAKER_ON, false),
             name = prefs.getString(KEY_SPEAKER_NAME, null),
         ),
+        lastRoom = prefs.getString(KEY_LAST_ROOM, null),
     )
 
     private companion object {
@@ -201,6 +206,7 @@ class KioskStore(context: Context) {
         const val KEY_PIN_SALT = "pin_salt"
         const val KEY_PIN_HASH = "pin_hash"
         const val KEY_MODE = "mode"
+        const val KEY_LAST_ROOM = "last_room"
         const val KEY_GUEST_AREA = "guest_area"
         const val KEY_GUEST_HIDDEN = "guest_hidden"
         const val KEY_GUEST_EXTRAS = "guest_extras"
