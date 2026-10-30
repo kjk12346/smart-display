@@ -1,5 +1,6 @@
 package dev.smartdisplay.app.ui.controls
 
+import dev.smartdisplay.app.ui.common.ConnectionNotice
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -163,13 +164,7 @@ private fun Header(
     ) {
         Column(Modifier.weight(1f)) {
             if (title != null) Text(title, style = MaterialTheme.typography.headlineMedium)
-            if (home.status != ConnectionStatus.Connected && home.status != ConnectionStatus.Idle) {
-                Text(
-                    text = stringResource(R.string.ambient_reconnecting),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            ConnectionNotice(home.status, home.loaded, Modifier.padding(top = 4.dp))
         }
         if (wifi != null) {
             TextButton(onClick = { showingWifi = true }) { Text(stringResource(R.string.wifi_button)) }

@@ -325,7 +325,7 @@
     <string name="live_waiting_protocol">Home Assistant sent something unexpected. Trying again shortly…</string>
     <string name="sign_out">Sign out</string>
 
-    <string name="ambient_reconnecting">Reconnecting to Home Assistant…</string>
+    <string name="connection_reconnecting">Reconnecting…</string>
     <string name="ambient_high_low">H %1$s  ·  L %2$s</string>
     <string name="ambient_high">H %1$s</string>
     <string name="ambient_low">L %1$s</string>

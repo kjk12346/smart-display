@@ -265,6 +265,9 @@ Home Assistant.
      `status`. Send commands with `command()` / `callService(..., returnResponse = true)`. Registry and core-config
      update events trigger a reload of that list. Tests run the real client against a fake Home Assistant
      (`FakeHomeAssistant.kt`, OkHttp MockWebServer).
+   - Being disconnected shows as a small chip with a pulsing dot (`ConnectionNotice`, "Reconnecting…"), top left
+     on the clock and under the Controls header, only after 5 s down (1.5 s before the first connection): Home
+     Assistant connections drop and come back within a second or two, and the old line of text flickered (2026-10-30).
    - Later, for big installs on slow tablets: `subscribe_entities` (compressed diffs) instead of `state_changed`, and
      persistent maps instead of copying `entities` on every event.
 5. **Ambient screen** (the default screen): large clock and date, weather from the first `weather.*` entity

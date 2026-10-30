@@ -74,6 +74,7 @@ import dev.smartdisplay.app.ha.DisconnectReason
 import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.kiosk.WallpaperConfig
 import dev.smartdisplay.app.ui.common.ScreenBrightness
+import dev.smartdisplay.app.ui.common.ConnectionNotice
 import dev.smartdisplay.app.ui.common.rememberMinuteClock
 import dev.smartdisplay.app.ui.theme.SmartDisplayTheme
 import java.time.LocalDate
@@ -277,12 +278,15 @@ private fun AmbientContent(
         } else {
             CenteredClock(landscape, now, nextAlarm, weather, forecast, night, sunrise, offsetX, offsetY, contentAlpha)
         }
-        val hint = when {
-            status is ConnectionStatus.Waiting -> R.string.ambient_reconnecting
-            status == ConnectionStatus.Connecting && !loaded -> R.string.live_connecting
-            status == ConnectionStatus.Connecting -> R.string.ambient_reconnecting
-            else -> null
-        }
+        // Tucked in the top-left corner, which neither clock layout uses, and only after a few seconds down.
+        ConnectionNotice(
+            status,
+            loaded,
+            Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+                .graphicsLayer { alpha = contentAlpha },
+        )
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = if (corner) {
@@ -308,14 +312,6 @@ private fun AmbientContent(
                 ) {
                     Text(stringResource(R.string.sunrise_im_up), fontSize = 24.sp)
                 }
-            }
-            if (hint != null) {
-                Text(
-                    text = stringResource(hint),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.graphicsLayer { alpha = contentAlpha * 0.8f },
-                )
             }
         }
     }
