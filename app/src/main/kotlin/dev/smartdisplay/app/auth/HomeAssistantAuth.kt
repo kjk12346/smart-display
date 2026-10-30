@@ -32,8 +32,12 @@ class AccessToken(val token: String, private val expiresAtMillis: Long) {
 
 class Tokens(val access: AccessToken, val refreshToken: String)
 
-/** Home Assistant refused the request (bad or expired code or token), as opposed to not answering. */
-class AuthRejectedException(val code: Int) : IOException("Home Assistant refused the request: HTTP $code")
+/**
+ * Home Assistant refused the request (bad or expired code or token), as opposed to not answering. [reason] is its
+ * own explanation, such as `invalid_grant`, when it gave one.
+ */
+class AuthRejectedException(val code: Int, val reason: String? = null) :
+    IOException("Home Assistant refused the request: HTTP $code${reason?.let { " ($it)" }.orEmpty()}")
 
 /** Home Assistant's OAuth-style login endpoints. Stateless; [Session] keeps the tokens. */
 class HomeAssistantAuth(private val http: OkHttpClient) {
@@ -83,7 +87,13 @@ class HomeAssistantAuth(private val http: OkHttpClient) {
     }
 
     private fun Response.jsonOrThrow(): JSONObject {
-        if (code in 400..499) throw AuthRejectedException(code)
+        if (code in 400..499) {
+            val reason = runCatching {
+                JSONObject(body.string()).let { listOf(it.optString("error"), it.optString("error_description")) }
+                    .filter { it.isNotEmpty() }.joinToString(": ")
+            }.getOrNull()
+            throw AuthRejectedException(code, reason?.takeIf { it.isNotEmpty() }?.take(200))
+        }
         if (!isSuccessful) throw IOException("HTTP $code")
         return try {
             JSONObject(body.string())

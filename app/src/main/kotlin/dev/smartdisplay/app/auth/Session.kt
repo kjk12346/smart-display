@@ -1,5 +1,6 @@
 package dev.smartdisplay.app.auth
 
+import android.util.Log
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.net.Uri
@@ -86,6 +87,7 @@ class Session(
             uri.getQueryParameter("state") == pending.state &&
             pending.serverUrl == currentServer()
         if (!valid) {
+            Log.w(TAG, "Sign-in redirect doesn't match the sign-in started (pending: ${pending != null})")
             _state.value = SessionState.SignedOut(SignInProblem.Interrupted)
             return
         }
@@ -95,8 +97,10 @@ class Session(
                 val tokens = auth.exchangeCode(pending!!.serverUrl, code!!)
                 store.saveRefreshToken(pending.serverUrl, tokens.refreshToken)
                 tokenLock.withLock { access = tokens.access }
+                Log.i(TAG, "Signed in")
                 SessionState.SignedIn
             } catch (e: AuthRejectedException) {
+                Log.w(TAG, "Sign-in code refused: ${e.message}")
                 SessionState.SignedOut(SignInProblem.Rejected)
             } catch (e: IOException) {
                 SessionState.SignedOut(SignInProblem.NoAnswer)
@@ -115,12 +119,15 @@ class Session(
         access?.takeIf { it.isFresh() }?.let { return it.token }
         val refreshToken = store.refreshToken(server)
         if (refreshToken == null) {
+            Log.w(TAG, "No saved sign-in to refresh with")
             if (_state.value == SessionState.SignedIn) _state.value = SessionState.SignedOut(SignInProblem.Expired)
             return null
         }
         try {
             auth.refresh(server, refreshToken).also { access = it }.token
         } catch (e: AuthRejectedException) {
+            // Home Assistant no longer knows this sign-in: it was removed there, or Home Assistant was restored.
+            Log.w(TAG, "Sign-in refresh refused, signing out: ${e.message}")
             access = null
             store.clearRefreshToken()
             _state.value = SessionState.SignedOut(SignInProblem.Expired)
@@ -168,3 +175,5 @@ class Session(
         const val TOOLBAR_COLOR = 0xFF151517.toInt()
     }
 }
+
+private const val TAG = "Session"

@@ -257,6 +257,10 @@ Home Assistant.
      client_id), so do it once, with the product name. Home Assistant has no PKCE; a random `state` guards the
      redirect. The refresh token is AES-GCM encrypted with an Android Keystore key (`auth/TokenCipher.kt`); access
      tokens live in memory only. Code in `auth/`; `Session.accessToken()` is what step 4 should use.
+   - Sign-in problems are logged (tags `Session`, `HomeAssistantClient`) with Home Assistant's own reason, e.g.
+     `invalid_request: Invalid code`, never a token. Home Assistant keeps sign-in codes in memory, so "Invalid
+     code" seconds after a sign-in means a different Home Assistant answered the exchange (two copies of one VM
+     on the network, same address and MAC).
 4. **Live connection**: WebSocket `{ha}/api/websocket` (`auth` with the access token, then `subscribe_events`
    `state_changed`, `get_states`, `get_config`, and the area/device/entity registry lists), reconnect with backoff,
    refresh the token when it expires.

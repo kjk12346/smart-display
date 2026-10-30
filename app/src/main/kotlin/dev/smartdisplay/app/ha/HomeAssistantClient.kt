@@ -262,9 +262,13 @@ class HomeAssistantClient(
                 put("type", "auth")
                 put("access_token", token)
             })
-            when (socket.incoming.receive().string("type")) {
+            val answer = socket.incoming.receive()
+            when (answer.string("type")) {
                 "auth_ok" -> true
-                "auth_invalid" -> false
+                "auth_invalid" -> {
+                    Log.w(TAG, "Access token refused: ${answer.string("message")}")
+                    false
+                }
                 else -> throw ProtocolException("Expected auth_ok or auth_invalid")
             }
         }
