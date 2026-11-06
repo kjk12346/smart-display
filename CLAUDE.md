@@ -221,8 +221,10 @@ The owner chose these after comparing with a commercial family calendar's softwa
   `calendar/event/create`, `/update` and `/delete`, so they reach Google Calendar through its integration. No PIN.
   Google through Home Assistant can create and delete but not update, so an edit adds the new one and then deletes the
   old (never the other way, so a failure can't lose it), which changes its ID; for a repeating event that only works
-  for one time. The fields are tested against the commands' documented shape only: **no event has yet been saved or
-  deleted from the display against a real calendar.**
+  for one time. Checked on the 15.6" tablet against the real Google calendar (2026-11-06): a timed event added, edited
+  (who it's for kept through the new ID) and deleted, each confirmed through Home Assistant's REST API; Android's own
+  Calendar app on the tablet notified of the new event, so it reached Google. Not yet tried from the display: repeating
+  events, all-day events, or deleting one time of a repeating event.
 - **Month and Family views** (`CalendarViews.kt`): two more on the calendar's switch. Month is whole weeks from the
   week start (`KitchenConfig.weekStart`, Settings; the week view still starts today), with as many events as fit, the
   count of the rest beside the date, and a tap on a day. Family is one day with a column per person down a shared
@@ -247,7 +249,7 @@ The owner chose these after comparing with a commercial family calendar's softwa
   the lucky draw, meal planning.
 - Checked on the 15.6" tablet (2026-11-06) in portrait and landscape with sample notes, routines and countdowns:
   month, family with real events, all the cards, the summary and the rewards dialog. Not seen on screen: Sources for
-  routines and the new Settings (behind the PIN), adding a list item, and saving an event. Unit-tested:
+  routines and the new Settings (behind the PIN), and adding a list item. Unit-tested:
   `CalendarFeaturesTest`, `FamilyBoardTest`.
 
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
