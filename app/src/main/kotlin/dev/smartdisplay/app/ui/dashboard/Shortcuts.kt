@@ -41,7 +41,7 @@ import dev.smartdisplay.app.ui.settings.ChoiceDialog
 import dev.smartdisplay.app.ui.settings.SettingRow
 
 /** Icons to pick from for a button: rooms, times of day and the things scenes and scripts tend to be about. */
-private val ICON_CHOICES = listOf(
+internal val ICON_CHOICES = listOf(
     "🌙", "☀️", "🌅", "🌇", "🛏️", "🛋️", "🍽️", "☕", "🎬", "📺", "🎵", "💡",
     "🔒", "🏠", "👋", "🚗", "✈️", "❄️", "🔥", "🌿", "🧺", "🚿", "🎉", "📚",
 )

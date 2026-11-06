@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.combinedClickable
@@ -69,13 +70,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.smartdisplay.app.R
-import dev.smartdisplay.app.ha.ConnectionStatus
 import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.kiosk.CardType
 import dev.smartdisplay.app.kiosk.DashCard
@@ -111,6 +108,7 @@ import dev.smartdisplay.app.ui.theme.color
 import dev.smartdisplay.app.ui.winddown.WindDownButton
 import java.time.LocalDate
 import java.time.format.TextStyle
+import java.time.temporal.WeekFields
 
 /**
  * The kitchen display's daytime screen: the time and weather with a few days' forecast, the family calendar, who's
@@ -132,6 +130,8 @@ fun DashboardScreen(
     onOpenAlarms: () -> Unit,
     onOpenSettings: () -> Unit,
     onDone: () -> Unit,
+    /** Today at a glance, from a tap on the clock. */
+    onOpenSummary: () -> Unit = {},
     /** Home Assistant's address, for pictures it gives as paths (cameras, cover art). */
     baseUrl: String?,
     /** Arranging the cards: asked for with a long press (the caller checks the PIN), left with Done. */
@@ -153,11 +153,6 @@ fun DashboardScreen(
     val runs by viewModel.runs.collectAsStateWithLifecycle()
     val calendarIds = remember(home.entities, home.registry, kitchen.hiddenCalendars) {
         home.calendars().map { it.entityId }.filterNot { it in kitchen.hiddenCalendars }
-    }
-    val connected = home.status == ConnectionStatus.Connected
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(connected, calendarIds) {
-        if (connected) lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.keepCalendarFresh(calendarIds) }
     }
     val events by viewModel.events.collectAsStateWithLifecycle()
     val selectedOwners by viewModel.selectedOwners.collectAsStateWithLifecycle()
@@ -294,7 +289,9 @@ fun DashboardScreen(
     val header: @Composable (wide: Boolean, clock: Dp) -> Unit = { wide, clock ->
         if (wide) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Clock(now, nextAlarm, size = clock, alignment = Alignment.Start)
+                Box(Modifier.clickable(onClick = onOpenSummary)) {
+                    Clock(now, nextAlarm, size = clock, alignment = Alignment.Start)
+                }
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -316,7 +313,9 @@ fun DashboardScreen(
                 val roomy = width >= 600.dp
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Clock(now, nextAlarm, size = clock, alignment = Alignment.Start)
+                        Box(Modifier.clickable(onClick = onOpenSummary)) {
+                            Clock(now, nextAlarm, size = clock, alignment = Alignment.Start)
+                        }
                         Spacer(if (roomy) Modifier.width(24.dp) else Modifier.weight(1f))
                         currentWeather()
                         if (roomy) {
@@ -389,6 +388,23 @@ fun DashboardScreen(
                 onAssign = viewModel::assign,
                 view = kitchen.calendarView,
                 onView = { onKitchenChange(kitchen.copy(calendarView = it)) },
+                actions = CalendarActions(
+                    // Calendars that can take a new event, the last one used first.
+                    writable = calendarIds
+                        .filter { home.calendarFeatures(it) and CALENDAR_CREATE != 0 }
+                        .sortedByDescending { it == kitchen.lastCalendar }
+                        .map { it to (names[it]?.friendlyName ?: it) },
+                    featuresOf = home::calendarFeatures,
+                    create = viewModel::createEvent,
+                    edit = { event, source, draft, chosen, thisAndLater ->
+                        viewModel.editEvent(
+                            event, source, home.calendarFeatures(source.calendarId), draft, chosen, thisAndLater,
+                        )
+                    },
+                    delete = viewModel::deleteEvent,
+                    showRange = viewModel::showRange,
+                ),
+                weekStart = kitchen.weekStart ?: WeekFields.of(LocalConfiguration.current.locales[0]).firstDayOfWeek,
                 now = now,
                 bounded = bounded,
                 modifier = modifier,
@@ -421,6 +437,10 @@ fun DashboardScreen(
             CardType.Camera -> CameraCard(card, home, baseUrl, modifier, bounded)
             CardType.Weather -> WeatherCard(weatherEntity, hours, allDays, sun, now, modifier, bounded)
             CardType.Wifi -> WifiCard(wifi, modifier, bounded)
+            CardType.Lists -> ListsCard(card, home, modifier, bounded)
+            CardType.Stickies -> StickiesCard(kitchen, onKitchenChange, modifier, bounded)
+            CardType.Countdowns -> CountdownsCard(kitchen, onKitchenChange, now.toLocalDate(), modifier, bounded)
+            CardType.Routines -> RoutinesCard(kitchen, household, onKitchenChange, now.toLocalDate(), modifier, bounded)
         }
     }
 
@@ -507,7 +527,7 @@ fun DashboardScreen(
                     onLayoutChange(added)
                     adding = false
                     // A new card of the kinds that keep their own sources starts with none: choose them now.
-                    if (!type.single) sourcesOf = id
+                    if (!type.single || type == CardType.Routines) sourcesOf = id
                 }
                 added != null
             },
@@ -635,6 +655,10 @@ private fun CardType.label(): Int = when (this) {
     CardType.Camera -> R.string.card_camera
     CardType.Weather -> R.string.card_weather
     CardType.Wifi -> R.string.card_wifi
+    CardType.Lists -> R.string.card_lists
+    CardType.Stickies -> R.string.card_stickies
+    CardType.Countdowns -> R.string.card_countdowns
+    CardType.Routines -> R.string.card_routines
 }
 
 private fun CardType.description(): Int = when (this) {
@@ -647,6 +671,10 @@ private fun CardType.description(): Int = when (this) {
     CardType.Camera -> R.string.card_camera_about
     CardType.Weather -> R.string.card_weather_about
     CardType.Wifi -> R.string.card_wifi_about
+    CardType.Lists -> R.string.card_lists_about
+    CardType.Stickies -> R.string.card_stickies_about
+    CardType.Countdowns -> R.string.card_countdowns_about
+    CardType.Routines -> R.string.card_routines_about
 }
 
 /** How tall the tall grid is while arranging cards on a phone. */

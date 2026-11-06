@@ -4,6 +4,7 @@ import dev.smartdisplay.app.speaker.newSpeakerUdn
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import java.time.DayOfWeek
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -88,6 +89,16 @@ class KioskStore(context: Context) {
         putString(KEY_KITCHEN_SHORTCUT_NAMES, encodeMap(kitchen.shortcutNames))
         putString(KEY_KITCHEN_SHORTCUT_ICONS, encodeMap(kitchen.shortcutIcons))
         putString(KEY_KITCHEN_CALENDAR_VIEW, kitchen.calendarView.name)
+        putString(KEY_KITCHEN_WEEK_START, kitchen.weekStart?.name)
+        putString(KEY_KITCHEN_LAST_CALENDAR, kitchen.lastCalendar)
+        putInt(KEY_KITCHEN_REMINDER_MINUTES, kitchen.reminders.minutesBefore ?: NO_REMINDER)
+        putBoolean(KEY_KITCHEN_REMINDER_ALL_DAY, kitchen.reminders.allDay)
+        putBoolean(KEY_KITCHEN_REMINDER_SOUND, kitchen.reminders.sound)
+        putBoolean(KEY_KITCHEN_REMINDER_VOICE, kitchen.reminders.voice)
+        putBoolean(KEY_KITCHEN_MORNING, kitchen.morningSummary)
+        putString(KEY_KITCHEN_STICKIES, encodeStickies(kitchen.stickies))
+        putString(KEY_KITCHEN_COUNTDOWNS, encodeCountdowns(kitchen.countdowns))
+        putString(KEY_KITCHEN_ROUTINES, encodeRoutineBook(kitchen.routineBook))
     }
 
     fun setSpeaker(speaker: SpeakerConfig) = update {
@@ -179,6 +190,19 @@ class KioskStore(context: Context) {
             shortcutIcons = decodeMap(prefs.getString(KEY_KITCHEN_SHORTCUT_ICONS, null)),
             calendarView = prefs.getString(KEY_KITCHEN_CALENDAR_VIEW, null)
                 .let { view -> CalendarView.entries.firstOrNull { it.name == view } } ?: CalendarView.Week,
+            weekStart = prefs.getString(KEY_KITCHEN_WEEK_START, null)
+                .let { day -> DayOfWeek.entries.firstOrNull { it.name == day } },
+            lastCalendar = prefs.getString(KEY_KITCHEN_LAST_CALENDAR, null),
+            reminders = ReminderConfig(
+                minutesBefore = prefs.getInt(KEY_KITCHEN_REMINDER_MINUTES, NO_REMINDER).takeIf { it != NO_REMINDER },
+                allDay = prefs.getBoolean(KEY_KITCHEN_REMINDER_ALL_DAY, false),
+                sound = prefs.getBoolean(KEY_KITCHEN_REMINDER_SOUND, true),
+                voice = prefs.getBoolean(KEY_KITCHEN_REMINDER_VOICE, true),
+            ),
+            morningSummary = prefs.getBoolean(KEY_KITCHEN_MORNING, true),
+            stickies = decodeStickies(prefs.getString(KEY_KITCHEN_STICKIES, null)),
+            countdowns = decodeCountdowns(prefs.getString(KEY_KITCHEN_COUNTDOWNS, null)),
+            routineBook = decodeRoutineBook(prefs.getString(KEY_KITCHEN_ROUTINES, null)),
         ),
         wifi = WifiConfig(
             ssid = prefs.getString(KEY_WIFI_SSID, null),
@@ -231,6 +255,17 @@ class KioskStore(context: Context) {
         const val KEY_KITCHEN_SHORTCUT_NAMES = "kitchen_shortcut_names"
         const val KEY_KITCHEN_SHORTCUT_ICONS = "kitchen_shortcut_icons"
         const val KEY_KITCHEN_CALENDAR_VIEW = "kitchen_calendar_view"
+        const val KEY_KITCHEN_WEEK_START = "kitchen_week_start"
+        const val KEY_KITCHEN_LAST_CALENDAR = "kitchen_last_calendar"
+        const val KEY_KITCHEN_REMINDER_MINUTES = "kitchen_reminder_minutes"
+        const val KEY_KITCHEN_REMINDER_ALL_DAY = "kitchen_reminder_all_day"
+        const val KEY_KITCHEN_REMINDER_SOUND = "kitchen_reminder_sound"
+        const val KEY_KITCHEN_REMINDER_VOICE = "kitchen_reminder_voice"
+        const val KEY_KITCHEN_MORNING = "kitchen_morning_summary"
+        const val KEY_KITCHEN_STICKIES = "kitchen_stickies"
+        const val KEY_KITCHEN_COUNTDOWNS = "kitchen_countdowns"
+        const val KEY_KITCHEN_ROUTINES = "kitchen_routines"
+        const val NO_REMINDER = -1
     }
 }
 

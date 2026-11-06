@@ -10,9 +10,9 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 
 /**
- * What a dashboard card shows. Calendar, Who's home, Buttons and Weather take their sources from [KitchenConfig] and
- * there's one of each; the others keep their own ([DashCard.areaId], [DashCard.entities]) and can be added more than
- * once.
+ * What a dashboard card shows. Calendar, Who's home, Buttons, Weather, Stickies, Countdowns and Routines take what
+ * they show from [KitchenConfig] and there's one of each; the others keep their own ([DashCard.areaId],
+ * [DashCard.entities]) and can be added more than once.
  */
 enum class CardType(val single: Boolean) {
     Calendar(true),
@@ -24,6 +24,10 @@ enum class CardType(val single: Boolean) {
     Camera(false),
     Weather(true),
     Wifi(true),
+    Lists(false),
+    Stickies(true),
+    Countdowns(true),
+    Routines(true),
 }
 
 /** A grid of cells the cards snap to: one for landscape, one for portrait. */
@@ -235,6 +239,10 @@ private val DEFAULT_SIZES = mapOf(
     CardType.Camera to ((4 to 4) to (6 to 4)),
     CardType.Weather to ((4 to 4) to (6 to 4)),
     CardType.Wifi to ((3 to 3) to (3 to 3)),
+    CardType.Lists to ((3 to 4) to (3 to 4)),
+    CardType.Stickies to ((3 to 3) to (3 to 3)),
+    CardType.Countdowns to ((3 to 3) to (3 to 3)),
+    CardType.Routines to ((4 to 4) to (6 to 4)),
 )
 
 /** The layout as JSON, for [KioskStore]. */

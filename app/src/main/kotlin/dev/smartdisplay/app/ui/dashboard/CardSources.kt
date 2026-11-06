@@ -80,6 +80,22 @@ internal fun CardSourcesDialog(
             },
             onDismiss = onDismiss,
         )
+        CardType.Lists -> ChoiceDialog(
+            title = stringResource(R.string.card_lists_choose),
+            items = home.choosable("todo").map { it.entityId to it.friendlyName },
+            selected = card.entities.toSet(),
+            multiple = true,
+            onChange = { id, on -> onCardChange(card.copy(entities = card.entities.toggled(id, on))) },
+            onDismiss = onDismiss,
+            note = stringResource(R.string.card_lists_note),
+        )
+        CardType.Stickies, CardType.Countdowns -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(if (card.type == CardType.Stickies) R.string.card_stickies else R.string.card_countdowns)) },
+            text = { Text(stringResource(R.string.card_family_sources)) },
+            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_done)) } },
+        )
+        CardType.Routines -> RoutinesSources(kitchen, home, onKitchenChange, onDismiss)
     }
 }
 

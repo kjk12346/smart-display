@@ -1,5 +1,7 @@
 package dev.smartdisplay.app.kiosk
 
+import java.time.DayOfWeek
+
 /**
  * A family / kitchen display: by day a dashboard with buttons for Home Assistant scenes, scripts and automations,
  * who's home, with Home and Away buttons, and the family calendar, colored by person.
@@ -40,10 +42,33 @@ data class KitchenConfig(
     val shortcutIcons: Map<String, String> = emptyMap(),
     /** How the calendar shows the days ahead: a column per day, or a list of what's coming. */
     val calendarView: CalendarView = CalendarView.Week,
+    /** The day the month view's weeks start on; null for the usual one where the display is. */
+    val weekStart: DayOfWeek? = null,
+    /** The calendar new events went on last, offered first next time. */
+    val lastCalendar: String? = null,
+    val reminders: ReminderConfig = ReminderConfig(),
+    /** Whether the morning summary comes up by itself each morning. */
+    val morningSummary: Boolean = true,
+    val stickies: List<Sticky> = emptyList(),
+    val countdowns: List<Countdown> = emptyList(),
+    val routineBook: RoutineBook = RoutineBook(),
 )
 
-/** The calendar card's two ways of showing events. */
-enum class CalendarView { Week, Agenda }
+/** The calendar card's ways of showing events. */
+enum class CalendarView { Week, Agenda, Month, Family }
+
+/** Reminders of events, spoken or with a sound, from the display. Off until a time is chosen. */
+data class ReminderConfig(
+    /** How long before a timed event to remind; 0 is as it starts, null is no reminders. */
+    val minutesBefore: Int? = null,
+    /** Also at 9 AM on the day of an all-day event. */
+    val allDay: Boolean = false,
+    val sound: Boolean = true,
+    val voice: Boolean = true,
+)
+
+/** The reminder times Settings offers, in minutes before. */
+val REMINDER_CHOICES = listOf(0, 5, 10, 15, 30, 60)
 
 const val DEFAULT_SCREENSAVER_MINUTES = 10
 

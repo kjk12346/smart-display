@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +32,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,8 +51,10 @@ import dev.smartdisplay.app.R
 import dev.smartdisplay.app.alarm.timeText
 import dev.smartdisplay.app.kiosk.CalendarView
 import dev.smartdisplay.app.ui.theme.OnPersonColor
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -67,13 +71,21 @@ private const val MIN_GRID_DAYS = 3
 private val AGENDA_COLUMN_WIDTH = 340.dp
 private const val MAX_AGENDA_COLUMNS = 3
 
+/** Narrower than this, a month's days can't be read, and it's the agenda. */
+private val MIN_MONTH_WIDTH = 330.dp
+
+/** Narrower than this, the view switch and Add go on a line of their own. */
+private val ONE_LINE_HEADER_WIDTH = 640.dp
+
 /**
  * The family calendar: a chip per person (and the family) to show only theirs, then the days ahead, in its [view]:
  * a column per day, as many as fit up to a week (a list by day where even a few don't), or an agenda of the next
  * two weeks, in columns of days on a wide card. Each event is in its owner's color. A switch in the corner changes
- * the view ([onView]); stacked on a phone, it's always the list.
+ * the view ([onView]); stacked on a phone, it's always the list. The view can also be a month, or Family View: one
+ * day with a column per person.
  *
- * Tapping an event opens its details, where it can be given to [people] ([onAssign]).
+ * Tapping an event opens its details, where it can be given to [people] ([onAssign]), changed or deleted. Add puts a
+ * new one on a calendar ([actions]), and tapping a day shows that day's.
  *
  * [events] is null until they've been fetched. In a column of fixed height ([bounded]) the days scroll by
  * themselves; stacked in a page that scrolls, they mustn't.
@@ -90,6 +102,8 @@ internal fun CalendarCard(
     onAssign: (event: ShownEvent, people: List<String>, everyTime: Boolean) -> Unit,
     view: CalendarView,
     onView: (CalendarView) -> Unit,
+    actions: CalendarActions,
+    weekStart: DayOfWeek,
     now: LocalDateTime,
     bounded: Boolean,
     modifier: Modifier,
@@ -99,14 +113,73 @@ internal fun CalendarCard(
     val colorOf = { owner: String -> colors[owner] ?: Color.Gray }
     val shown = events?.forOwners(selected)
     var open by remember { mutableStateOf<ShownEvent?>(null) }
+    var openDay by remember { mutableStateOf<LocalDate?>(null) }
+    var addingOn by remember { mutableStateOf<LocalDate?>(null) }
+    var editing by remember { mutableStateOf<ShownEvent?>(null) }
+    var month by remember { mutableStateOf(YearMonth.from(now)) }
+    var familyDay by remember { mutableStateOf(now.toLocalDate()) }
     val onOpen = { event: ShownEvent -> open = event }
+
+    // The days ahead are always fetched; a month, or another day, asks for its own.
+    LaunchedEffect(view, bounded, month, familyDay, weekStart) {
+        when {
+            !bounded -> actions.showRange(null, null)
+            view == CalendarView.Month -> monthDays(month, weekStart).let { actions.showRange(it.first(), it.last()) }
+            view == CalendarView.Family -> actions.showRange(familyDay, familyDay)
+            else -> actions.showRange(null, null)
+        }
+    }
+
     open?.let { event ->
+        val source = event.changeableSource(actions.featuresOf)
+        val features = source?.let { actions.featuresOf(it.calendarId) } ?: 0
         EventDialog(
             event = event,
             people = people,
             calendarName = calendarName,
             onSave = { chosen, everyTime -> onAssign(event, chosen, everyTime) },
             onDismiss = { open = null },
+            onEdit = if (source != null && canEdit(features)) {
+                {
+                    open = null
+                    editing = event
+                }
+            } else {
+                null
+            },
+            onDelete = if (source != null && features and CALENDAR_DELETE != 0) {
+                { thisAndLater -> actions.delete(event, source, thisAndLater) }
+            } else {
+                null
+            },
+        )
+    }
+    openDay?.let { date ->
+        DayDialog(
+            date = date,
+            events = week(shown.orEmpty(), date, 1).first().events,
+            now = now,
+            colorOf = colorOf,
+            canAdd = actions.writable.isNotEmpty(),
+            onOpen = onOpen,
+            onAdd = {
+                openDay = null
+                addingOn = date
+            },
+            onDismiss = { openDay = null },
+        )
+    }
+    addingOn?.let { date ->
+        EventEditor(null, null, date, actions, people, onDismiss = { addingOn = null })
+    }
+    editing?.let { event ->
+        EventEditor(
+            event,
+            event.changeableSource(actions.featuresOf),
+            event.start.toLocalDate(),
+            actions,
+            people,
+            onDismiss = { editing = null },
         )
     }
     Surface(
@@ -116,22 +189,51 @@ internal fun CalendarCard(
         modifier = modifier,
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(if (agendaView) R.string.calendar_agenda_title else R.string.dashboard_calendar),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-                Box(Modifier.weight(1f)) {
-                    // The family's events are everyone's, so "Everyone" stands for them: no chip of their own.
-                    val people = owners.filter { it.id != FAMILY }
-                    if (owners.size > 1 && people.isNotEmpty()) {
-                        Box(Modifier.padding(start = 16.dp)) { OwnerChips(people, selected, onToggle, onEveryone) }
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val controls: @Composable () -> Unit = {
+                    if (bounded) ViewSwitch(view, onView)
+                    if (actions.writable.isNotEmpty()) {
+                        FilledTonalButton(
+                            onClick = { addingOn = if (view == CalendarView.Family) familyDay else now.toLocalDate() },
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) { Text(stringResource(R.string.calendar_add)) }
                     }
                 }
-                if (bounded) {
-                    Spacer(Modifier.width(12.dp))
-                    ViewSwitch(view, onView)
+                val roomy = !bounded || maxWidth >= ONE_LINE_HEADER_WIDTH
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(
+                                when {
+                                    agendaView -> R.string.calendar_agenda_title
+                                    view == CalendarView.Family -> R.string.calendar_family_title
+                                    view == CalendarView.Month -> R.string.calendar_month_title
+                                    else -> R.string.dashboard_calendar
+                                },
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
+                        Box(Modifier.weight(1f)) {
+                            // The family's events are everyone's, so "Everyone" stands for them: no chip of their own.
+                            val people = owners.filter { it.id != FAMILY }
+                            if (owners.size > 1 && people.isNotEmpty()) {
+                                Box(Modifier.padding(start = 16.dp)) {
+                                    OwnerChips(people, selected, onToggle, onEveryone)
+                                }
+                            }
+                        }
+                        if (roomy) {
+                            Spacer(Modifier.width(12.dp))
+                            controls()
+                        }
+                    }
+                    if (!roomy) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        ) { controls() }
+                    }
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -139,11 +241,24 @@ internal fun CalendarCard(
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                     val fit = (maxWidth / MIN_DAY_WIDTH).toInt().coerceAtMost(CALENDAR_DAYS)
                     val columns = (maxWidth / AGENDA_COLUMN_WIDTH).toInt().coerceIn(1, MAX_AGENDA_COLUMNS)
-                    if (!agendaView && fit >= MIN_GRID_DAYS) {
-                        WeekGrid(shown, now, fit, colorOf, onOpen)
+                    if (view == CalendarView.Month && maxWidth >= MIN_MONTH_WIDTH) {
+                        MonthView(shown, month, { month = it }, weekStart, now, colorOf, onOpenDay = { openDay = it })
+                    } else if (view == CalendarView.Family) {
+                        // Only the people picked, when some are; everyone with a calendar otherwise.
+                        val columnsOf = owners.filter { selected.isEmpty() || it.id in selected }
+                        FamilyDayView(shown, columnsOf, familyDay, { familyDay = it }, now, colorOf, onOpen)
+                    } else if (view == CalendarView.Week && fit >= MIN_GRID_DAYS) {
+                        WeekGrid(shown, now, fit, colorOf, onOpen, onOpenDay = { openDay = it })
                     } else {
                         // Too narrow for the week, the days go in one column of the agenda.
-                        AgendaColumns(shown, now, if (agendaView) columns else 1, colorOf, onOpen, scroll = true)
+                        AgendaColumns(
+                            shown,
+                            now,
+                            if (view == CalendarView.Agenda) columns else 1,
+                            colorOf,
+                            onOpen,
+                            scroll = true,
+                        )
                     }
                 }
             } else {
@@ -192,7 +307,7 @@ private fun OwnerChips(
     }
 }
 
-/** Week or Agenda. */
+/** Week, Agenda, Month or Family. */
 @Composable
 private fun ViewSwitch(view: CalendarView, onView: (CalendarView) -> Unit) {
     SingleChoiceSegmentedButtonRow {
@@ -209,6 +324,8 @@ private fun ViewSwitch(view: CalendarView, onView: (CalendarView) -> Unit) {
                         when (option) {
                             CalendarView.Week -> R.string.calendar_view_week
                             CalendarView.Agenda -> R.string.calendar_view_agenda
+                            CalendarView.Month -> R.string.calendar_view_month
+                            CalendarView.Family -> R.string.calendar_view_family
                         },
                     ),
                 )
@@ -225,6 +342,7 @@ private fun WeekGrid(
     dayCount: Int,
     colorOf: (String) -> Color,
     onOpen: (ShownEvent) -> Unit,
+    onOpenDay: (LocalDate) -> Unit,
 ) {
     val today = now.toLocalDate()
     val days = week(events.orEmpty(), today, dayCount)
@@ -243,24 +361,29 @@ private fun WeekGrid(
                     )
                     .padding(horizontal = 4.dp, vertical = 8.dp),
             ) {
-                Text(
-                    formatDate(day.date.atStartOfDay(), "EEE", locale),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .padding(top = 2.dp, bottom = 8.dp)
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent),
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth().clickable { onOpenDay(day.date) },
                 ) {
                     Text(
-                        day.date.dayOfMonth.toString(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (isToday) OnPersonColor else MaterialTheme.colorScheme.onSurface,
+                        formatDate(day.date.atStartOfDay(), "EEE", locale),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .padding(top = 2.dp, bottom = 8.dp)
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent),
+                    ) {
+                        Text(
+                            day.date.dayOfMonth.toString(),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (isToday) OnPersonColor else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
                 }
                 Column(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -285,7 +408,7 @@ private fun WeekGrid(
  * An event shared by several people shows the others' colors as dots.
  */
 @Composable
-private fun EventChip(
+internal fun EventChip(
     event: ShownEvent,
     time: String?,
     past: Boolean,
@@ -303,7 +426,7 @@ private fun EventChip(
         }
     }
     val shape = RoundedCornerShape(10.dp)
-    val modifier = Modifier.fillMaxWidth().alpha(if (past) 0.45f else 1f).clip(shape).clickable(onClick = onClick)
+    val modifier = Modifier.fillMaxWidth().alpha(if (past) PAST_ALPHA else 1f).clip(shape).clickable(onClick = onClick)
     if (event.allDay) {
         Column(modifier = modifier.background(color).padding(horizontal = 8.dp, vertical = 6.dp)) {
             Text(

@@ -211,6 +211,45 @@ Home Assistant.
   after `KitchenConfig.screensaverMinutes` untouched (Settings, default 10, or never); at night after 2 minutes, as
   before. A tap brings the dashboard back. The dashboard itself also drifts by `burnInOffset` each minute.
 
+## Family features inspired by calendar displays (added 2026-11-06, version 0.1.20)
+
+The owner chose these after comparing with a commercial family calendar's software. All are for kitchen mode.
+
+- **Adding, changing and deleting events:** `+ Add` on the calendar card, or a tap on a day (`DayDialog`), opens
+  `EventEditor`; an event's details (`EventDialog`) offer Edit and Delete where its calendar allows
+  (`supported_features`: create 1, delete 2, update 4). Written with Home Assistant's websocket commands
+  `calendar/event/create`, `/update` and `/delete`, so they reach Google Calendar through its integration. No PIN.
+  Google through Home Assistant can create and delete but not update, so an edit adds the new one and then deletes the
+  old (never the other way, so a failure can't lose it), which changes its ID; for a repeating event that only works
+  for one time. The fields are tested against the commands' documented shape only: **no event has yet been saved or
+  deleted from the display against a real calendar.**
+- **Month and Family views** (`CalendarViews.kt`): two more on the calendar's switch. Month is whole weeks from the
+  week start (`KitchenConfig.weekStart`, Settings; the week view still starts today), with as many events as fit, the
+  count of the rest beside the date, and a tap on a day. Family is one day with a column per person down a shared
+  timeline (`timeline`, `timelineHours`); the day and names stay put, the hours scroll, opening at the time now. In a
+  short card both scroll rather than squeeze. Both fetch their own days (`DashboardViewModel.showRange`).
+- **Past events fade** in the week, month and family views (`PAST_ALPHA`); the agenda leaves them out.
+- **Reminders** (Settings > Family dashboard, off by default): `KitchenOverlays` runs `checkReminders` each minute;
+  `dueReminders` is pure. A banner over the clock and dashboard, plus the notification sound and/or text-to-speech
+  (`Announcer`; the manifest declares a `queries` entry for `TTS_SERVICE`). Silent in the quiet hours. They only work
+  while the app is running, unlike alarms. The sound and voice haven't been heard on a device yet.
+- **The calendar now runs from `KitchenOverlays`** (from `AppContent`, whichever screen shows), not `DashboardScreen`,
+  so reminders and the summary work over the clock.
+- **Morning summary** (`KitchenOverlays.kt`): today's events, weather, routines left, the next countdowns and pinned
+  notes. Comes up by itself once a day from the end of the quiet hours until 9 AM, until tapped (Settings can turn that
+  off); a tap on the dashboard's clock shows it any time.
+- **Lists card** (`ListsCard.kt`, one or more of Home Assistant's `todo.*`): `todo/item/list` and the `todo.*` actions,
+  read again each minute, so the phone app sees the same.
+- **Stickies, Countdowns and Routines cards** (`FamilyCards.kt`, `RoutinesCard.kt`; data in `kiosk/FamilyBoard.kt`):
+  kept on the display (`KitchenConfig`), since Home Assistant has nowhere for them, so not shared between displays.
+  Anyone can add notes and countdowns and tick off routines; routines, rewards and hand-given points are set in the
+  card's Sources, behind the PIN. Left out on purpose for now: photos on notes, routines that carry over when missed,
+  the lucky draw, meal planning.
+- Checked on the 15.6" tablet (2026-11-06) in portrait and landscape with sample notes, routines and countdowns:
+  month, family with real events, all the cards, the summary and the rewards dialog. Not seen on screen: Sources for
+  routines and the new Settings (behind the PIN), adding a list item, and saving an event. Unit-tested:
+  `CalendarFeaturesTest`, `FamilyBoardTest`.
+
 **This repo is public.** The owner's personal setup (paths, test devices, home network, other projects) is in
 `CLAUDE.local.md`, which is not committed. Keep personal details out of committed files and commit messages.
 

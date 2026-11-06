@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -26,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,11 +39,13 @@ import androidx.core.text.HtmlCompat
 import dev.smartdisplay.app.R
 import dev.smartdisplay.app.alarm.timeText
 import dev.smartdisplay.app.ui.theme.OnPersonColor
+import kotlinx.coroutines.launch
 
 /**
  * An event's details, and who it's for: the household's people as chips, ticked for the people it's shown as now.
  * Saving gives it to the ticked people on this display (for a repeating event, this time or every time); none
- * ticked goes back to whose calendar it's on. Nothing changes in the calendar itself.
+ * ticked goes back to whose calendar it's on. That doesn't change the calendar itself, but [onEdit] and [onDelete] do,
+ * where the calendar allows it.
  */
 @Composable
 internal fun EventDialog(
@@ -50,7 +54,14 @@ internal fun EventDialog(
     calendarName: (calendarId: String) -> String,
     onSave: (people: List<String>, everyTime: Boolean) -> Unit,
     onDismiss: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    onDelete: (suspend (thisAndLater: Boolean) -> Boolean)? = null,
 ) {
+    var deleting by remember { mutableStateOf(false) }
+    if (deleting && onDelete != null) {
+        DeleteEventDialog(event, onDelete, onDeleted = onDismiss, onCancel = { deleting = false })
+        return
+    }
     val initial = remember(event) { event.owners.filter { owner -> people.any { it.id == owner } } }
     val chosen = remember(event) { mutableStateListOf(*initial.toTypedArray()) }
     val initialEveryTime = event.assigned != Assignment.ThisTime
@@ -138,6 +149,16 @@ internal fun EventDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
+                if (onEdit != null || onDelete != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                        onEdit?.let { TextButton(onClick = it) { Text(stringResource(R.string.event_edit)) } }
+                        onDelete?.let {
+                            TextButton(onClick = { deleting = true }) {
+                                Text(stringResource(R.string.event_delete), color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -151,6 +172,51 @@ internal fun EventDialog(
             ) { Text(stringResource(R.string.pin_save)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+/** Are you sure: it goes from the calendar itself, and so from everyone's phones. A repeating event asks which times. */
+@Composable
+private fun DeleteEventDialog(
+    event: ShownEvent,
+    onDelete: suspend (thisAndLater: Boolean) -> Boolean,
+    onDeleted: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    fun delete(thisAndLater: Boolean) {
+        busy = true
+        failed = false
+        scope.launch {
+            val done = onDelete(thisAndLater)
+            busy = false
+            if (done) onDeleted() else failed = true
+        }
+    }
+    AlertDialog(
+        onDismissRequest = { if (!busy) onCancel() },
+        title = { Text(stringResource(R.string.event_delete_title, event.summary.ifEmpty { stringResource(R.string.event_untitled) })) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.event_delete_body))
+                if (failed) Text(stringResource(R.string.event_delete_failed), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = {
+            Row {
+                if (event.repeats) {
+                    TextButton(onClick = { delete(true) }, enabled = !busy) {
+                        Text(stringResource(R.string.event_delete_later))
+                    }
+                }
+                TextButton(onClick = { delete(false) }, enabled = !busy) {
+                    Text(stringResource(if (event.repeats) R.string.event_delete_this_time else R.string.event_delete))
+                }
+            }
+        },
+        dismissButton = { TextButton(onClick = onCancel, enabled = !busy) { Text(stringResource(R.string.cancel)) } },
     )
 }
 

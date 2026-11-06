@@ -18,6 +18,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,17 +29,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.smartdisplay.app.R
 import dev.smartdisplay.app.ha.HomeState
 import dev.smartdisplay.app.kiosk.KitchenConfig
 import dev.smartdisplay.app.kiosk.PersonColor
+import dev.smartdisplay.app.kiosk.REMINDER_CHOICES
+import dev.smartdisplay.app.kiosk.ReminderConfig
 import dev.smartdisplay.app.kiosk.SCREENSAVER_CHOICES
 import dev.smartdisplay.app.kiosk.personColors
 import dev.smartdisplay.app.ui.common.PanelBody
+import dev.smartdisplay.app.ui.dashboard.DashboardViewModel
 import dev.smartdisplay.app.ui.dashboard.FAMILY
 import dev.smartdisplay.app.ui.dashboard.calendarOwner
 import dev.smartdisplay.app.ui.dashboard.calendars
@@ -46,6 +52,8 @@ import dev.smartdisplay.app.ui.dashboard.people
 import dev.smartdisplay.app.ui.dashboard.runnables
 import dev.smartdisplay.app.ui.theme.color
 import dev.smartdisplay.app.ui.theme.label
+import java.time.DayOfWeek
+import java.time.format.TextStyle
 
 /**
  * The kitchen dashboard's buttons, what its Home and Away buttons run, whose each calendar is (or that it isn't
@@ -113,6 +121,77 @@ fun KitchenSettings(kitchen: KitchenConfig, home: HomeState, onChange: (KitchenC
                         },
                     )
                 },
+            )
+        }
+    }
+
+    Heading(stringResource(R.string.kitchen_reminders))
+    PanelBody(stringResource(R.string.kitchen_reminders_body), topPadding = 2.dp)
+    val reminders = kitchen.reminders
+    fun setReminders(changed: ReminderConfig) = onChange(kitchen.copy(reminders = changed))
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState()),
+    ) {
+        FilterChip(
+            selected = reminders.minutesBefore == null,
+            onClick = { setReminders(reminders.copy(minutesBefore = null)) },
+            label = { Text(stringResource(R.string.kitchen_reminders_off)) },
+        )
+        REMINDER_CHOICES.forEach { minutes ->
+            FilterChip(
+                selected = reminders.minutesBefore == minutes,
+                onClick = { setReminders(reminders.copy(minutesBefore = minutes)) },
+                label = {
+                    Text(
+                        if (minutes == 0) {
+                            stringResource(R.string.kitchen_reminders_at_start)
+                        } else {
+                            stringResource(R.string.kitchen_reminders_before, minutes)
+                        },
+                    )
+                },
+            )
+        }
+    }
+    if (reminders.minutesBefore != null) {
+        val calendar = viewModel<DashboardViewModel>()
+        SwitchRow(stringResource(R.string.kitchen_reminders_voice), reminders.voice) {
+            setReminders(reminders.copy(voice = it))
+        }
+        SwitchRow(stringResource(R.string.kitchen_reminders_sound), reminders.sound) {
+            setReminders(reminders.copy(sound = it))
+        }
+        SwitchRow(stringResource(R.string.kitchen_reminders_all_day), reminders.allDay) {
+            setReminders(reminders.copy(allDay = it))
+        }
+        OutlinedButton(onClick = { calendar.tryReminder(reminders) }, modifier = Modifier.padding(top = 8.dp)) {
+            Text(stringResource(R.string.kitchen_reminders_try))
+        }
+    }
+
+    Heading(stringResource(R.string.kitchen_morning))
+    SwitchRow(stringResource(R.string.kitchen_morning_body), kitchen.morningSummary) {
+        onChange(kitchen.copy(morningSummary = it))
+    }
+
+    Heading(stringResource(R.string.kitchen_week_start))
+    PanelBody(stringResource(R.string.kitchen_week_start_body), topPadding = 2.dp)
+    val locale = LocalConfiguration.current.locales[0]
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState()),
+    ) {
+        FilterChip(
+            selected = kitchen.weekStart == null,
+            onClick = { onChange(kitchen.copy(weekStart = null)) },
+            label = { Text(stringResource(R.string.kitchen_week_start_auto)) },
+        )
+        listOf(DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.SATURDAY).forEach { day ->
+            FilterChip(
+                selected = kitchen.weekStart == day,
+                onClick = { onChange(kitchen.copy(weekStart = day)) },
+                label = { Text(day.getDisplayName(TextStyle.FULL, locale)) },
             )
         }
     }
@@ -306,6 +385,14 @@ private fun ColorDialog(title: String, selected: PersonColor?, onChoose: (Person
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_done)) } },
     )
+}
+
+@Composable
+private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(end = 12.dp))
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
 }
 
 @Composable

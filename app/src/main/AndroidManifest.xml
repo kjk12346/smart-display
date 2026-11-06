@@ -94,4 +94,11 @@
             </intent-filter>
         </activity-alias>
     </application>
+
+    <!-- To say reminders out loud with whichever speech engine the tablet has. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
 </manifest>

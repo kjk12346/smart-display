@@ -479,4 +479,145 @@
         <item quantity="one">%1$d light: %2$s</item>
         <item quantity="other">%1$d lights: %2$s</item>
     </plurals>
+    <!-- Calendar: adding, changing, deleting -->
+    <string name="calendar_add">+ Add</string>
+    <string name="calendar_view_month">Month</string>
+    <string name="calendar_view_family">Family</string>
+    <string name="calendar_family_title">Family day</string>
+    <string name="calendar_month_title">Calendar</string>
+    <string name="calendar_more">+%1$d more</string>
+    <string name="calendar_day_empty">Nothing this day.</string>
+    <string name="event_add">Add event</string>
+    <string name="event_edit">Edit</string>
+    <string name="event_title">What</string>
+    <string name="event_starts">Starts</string>
+    <string name="event_ends">Ends</string>
+    <string name="event_last_day">Last day</string>
+    <string name="event_end_before_start">It has to end after it starts.</string>
+    <string name="event_repeat">Repeats</string>
+    <string name="event_repeat_never">Never</string>
+    <string name="event_repeat_daily">Daily</string>
+    <string name="event_repeat_weekly">Weekly</string>
+    <string name="event_repeat_monthly">Monthly</string>
+    <string name="event_repeat_yearly">Yearly</string>
+    <string name="event_calendar">Calendar</string>
+    <string name="event_this_and_later">This and later</string>
+    <string name="event_edit_one_time">This changes just this time. To change every time, use Google Calendar.</string>
+    <string name="event_location">Where</string>
+    <string name="event_notes">Notes</string>
+    <string name="event_saving">Saving…</string>
+    <string name="event_save_failed">Couldn\'t save it. Check that Home Assistant is connected and try again.</string>
+    <string name="event_delete">Delete</string>
+    <string name="event_delete_title">Delete %1$s?</string>
+    <string name="event_delete_body">It\'s removed from the calendar itself, so also from everyone\'s phones.</string>
+    <string name="event_delete_failed">Couldn\'t delete it. Check that Home Assistant is connected and try again.</string>
+    <string name="event_delete_later">This and later</string>
+    <string name="event_delete_this_time">This time</string>
+
+    <!-- Reminders -->
+    <string name="reminder_now">%1$s is starting</string>
+    <string name="reminder_today">Today: %1$s</string>
+    <plurals name="reminder_in_minutes">
+        <item quantity="one">%1$s in %2$d minute</item>
+        <item quantity="other">%1$s in %2$d minutes</item>
+    </plurals>
+    <string name="reminder_try_sentence">Soccer practice in 10 minutes</string>
+    <string name="reminder_dismiss">Dismiss</string>
+    <string name="kitchen_reminders">Event reminders</string>
+    <string name="kitchen_reminders_body">Before each event, its name comes up on the display and it says so out loud. Silent from 10 PM to 7 AM.</string>
+    <string name="kitchen_reminders_off">Off</string>
+    <string name="kitchen_reminders_at_start">As it starts</string>
+    <string name="kitchen_reminders_before">%1$d min before</string>
+    <string name="kitchen_reminders_voice">Say it out loud</string>
+    <string name="kitchen_reminders_sound">Play a sound</string>
+    <string name="kitchen_reminders_all_day">All-day events too, at 9 AM</string>
+    <string name="kitchen_reminders_try">Try it</string>
+    <string name="search_kw_reminders">alert notify notification voice speak sound announce event</string>
+
+    <!-- Morning summary and week start -->
+    <string name="kitchen_morning">Morning summary</string>
+    <string name="kitchen_morning_body">Show today\'s events and weather each morning from 7 until 9, until tapped. A tap on the dashboard\'s clock shows it any time.</string>
+    <string name="search_kw_morning">daily board today summary greeting</string>
+    <string name="kitchen_week_start">Week starts on</string>
+    <string name="kitchen_week_start_body">For the calendar\'s month view. The week view always starts today.</string>
+    <string name="kitchen_week_start_auto">Automatic</string>
+    <string name="search_kw_week_start">first day sunday monday month calendar</string>
+    <string name="summary_morning">Good morning</string>
+    <string name="summary_afternoon">Good afternoon</string>
+    <string name="summary_evening">Good evening</string>
+    <string name="summary_today">Today</string>
+    <string name="summary_no_events">Nothing on the calendar today.</string>
+    <string name="summary_tap">Tap to close</string>
+    <plurals name="summary_routines_left">
+        <item quantity="one">%1$s has %2$d routine left</item>
+        <item quantity="other">%1$s has %2$d routines left</item>
+    </plurals>
+
+    <!-- Lists -->
+    <string name="card_lists">Lists</string>
+    <string name="card_lists_about">Home Assistant\'s to-do lists, such as its shopping list: add to them and tick things off.</string>
+    <string name="card_lists_choose">Choose lists</string>
+    <string name="card_lists_note">These are Home Assistant\'s to-do lists, so you see the same in its phone app.</string>
+    <string name="card_lists_none">No list chosen. Long-press the dashboard, then choose this card\'s Sources.</string>
+    <string name="lists_add">Add an item…</string>
+    <string name="lists_add_button">Add</string>
+    <string name="lists_clear_done">Clear what\'s done</string>
+    <string name="lists_failed">Couldn\'t save that. Check that Home Assistant is connected.</string>
+
+    <!-- Stickies and countdowns -->
+    <string name="card_stickies">Stickies</string>
+    <string name="card_stickies_about">Short notes for the family.</string>
+    <string name="card_family_sources">These are added on the card itself, with its Add button, and tapped to change. They\'re kept on this display.</string>
+    <string name="stickies_add">+ Add note</string>
+    <string name="stickies_edit">Edit note</string>
+    <string name="stickies_none">No notes yet.</string>
+    <string name="stickies_text">Note</string>
+    <string name="stickies_pin">Pin it, and show it on the morning summary</string>
+    <string name="family_remove">Remove</string>
+    <string name="card_countdowns">Countdowns</string>
+    <string name="card_countdowns_about">Days to go until a birthday, a trip or anything else.</string>
+    <string name="countdowns_add">+ Add</string>
+    <string name="countdowns_edit">Edit countdown</string>
+    <string name="countdowns_none">Nothing to count down to yet.</string>
+    <string name="countdowns_what">What for</string>
+    <string name="countdowns_yearly">Every year, like a birthday</string>
+    <string name="countdowns_past">That date has passed.</string>
+    <string name="countdowns_today">Today!</string>
+    <string name="countdowns_tomorrow">Tomorrow</string>
+    <plurals name="countdowns_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+
+    <!-- Routines and points -->
+    <string name="card_routines">Routines</string>
+    <string name="card_routines_about">What each person does today, with points they can spend on rewards.</string>
+    <string name="routines_none">No routines yet. Long-press the dashboard, then choose this card\'s Sources.</string>
+    <string name="routines_none_today">Nothing to do today.</string>
+    <string name="routines_rewards">Rewards</string>
+    <string name="routines_progress">%1$d/%2$d done · %3$d pts</string>
+    <string name="routines_all_done">All done for today, %1$s!</string>
+    <string name="routines_balance">%1$s: %2$d</string>
+    <string name="routines_redeem">Redeem</string>
+    <string name="routines_redeem_title">Redeem %1$s?</string>
+    <plurals name="routines_redeem_body">
+        <item quantity="one">This takes %1$d point from %2$s.</item>
+        <item quantity="other">This takes %1$d points from %2$s.</item>
+    </plurals>
+    <plurals name="routines_points">
+        <item quantity="one">%1$d point</item>
+        <item quantity="other">%1$d points</item>
+    </plurals>
+    <string name="routines_history">Lately</string>
+    <string name="routines_adjusted">Changed by hand</string>
+    <string name="routines_add">+ Add routine</string>
+    <string name="routines_edit">Edit routine</string>
+    <string name="routines_add_reward">+ Add reward</string>
+    <string name="routines_edit_reward">Edit reward</string>
+    <string name="routines_points_title">Points</string>
+    <string name="routines_what">What to do</string>
+    <string name="routines_who">Who does it</string>
+    <string name="routines_days">Which days</string>
+    <string name="routines_reward_what">What it is</string>
+    <string name="routines_cost">Cost in points</string>
 </resources>

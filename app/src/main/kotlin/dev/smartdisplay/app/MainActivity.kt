@@ -49,6 +49,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import dev.smartdisplay.app.ui.common.NowPlayingBar
 import dev.smartdisplay.app.speaker.Speaker
+import dev.smartdisplay.app.ui.dashboard.KitchenOverlays
 import dev.smartdisplay.app.kiosk.defaultSpeakerName
 import dev.smartdisplay.app.ui.common.rememberMinuteClock
 import dev.smartdisplay.app.ui.common.WindowBrightness
@@ -309,6 +310,7 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                 }
             }
             val openSettings = { if (kiosk.hasPin) askingPin = true else screen = Screen.Settings }
+            var summaryOpen by rememberSaveable { mutableStateOf(false) }
 
             // Full screen for the whole display, not per screen: switching screens would briefly show the bars.
             HideSystemBars()
@@ -338,6 +340,7 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                             onOpenAlarms = { screen = Screen.Alarms },
                             onOpenSettings = openSettings,
                             onDone = { screen = Screen.Ambient },
+                            onOpenSummary = { summaryOpen = true },
                             baseUrl = current.url,
                             editing = editing,
                             onEditRequest = { if (kiosk.hasPin) askingEditPin = true else editing = true },
@@ -383,6 +386,16 @@ private fun AppContent(app: SmartDisplayApp, screenOffs: Flow<Unit>) {
                 // At the top over the clock, whose corners are taken; at the bottom elsewhere, under the headers.
                 val barAt = if (screen == Screen.Ambient) Alignment.TopCenter else Alignment.BottomCenter
                 NowPlayingBar(app.speaker, barAt)
+            }
+            // The calendar, reminders and the morning summary, whichever screen is showing.
+            if (kiosk.isKitchen) {
+                KitchenOverlays(
+                    home = home,
+                    kitchen = kiosk.kitchen,
+                    resting = screen == Screen.Ambient || screen == Screen.Dashboard,
+                    summaryOpen = summaryOpen,
+                    onSummaryOpen = { summaryOpen = it },
+                )
             }
             if (askingPin) {
                 EnterPinDialog(
